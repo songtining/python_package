@@ -23,7 +23,7 @@ jobs:
 
       - name: Build EXE
         run: |
-          pyinstaller --onefile your_script.py
+          pyinstaller --onefile 小红框识别.py
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v2
