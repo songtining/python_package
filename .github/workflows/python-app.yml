@@ -35,4 +35,4 @@ jobs:
       uses: actions/upload-artifact@v3  # 更新为最新版本的 upload-artifact 动作
       with:
         name: built-exe
-        path: dist/script.exe
+        path: dist/SyntheticQRCode.exe
