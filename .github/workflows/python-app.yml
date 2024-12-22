@@ -11,10 +11,10 @@ jobs:
 
     steps:
     - name: Checkout Code
-      uses: actions/checkout@v2  # 检出代码
+      uses: actions/checkout@v3  # 更新为最新版本的 checkout 动作
 
     - name: Setup Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4  # 更新为最新版本的 setup-python 动作
       with:
         python-version: 3.9  # 指定 Python 版本
 
@@ -32,7 +32,7 @@ jobs:
         pyinstaller --onefile script.py
 
     - name: Upload EXE
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3  # 更新为最新版本的 upload-artifact 动作
       with:
         name: built-exe
         path: dist/script.exe
