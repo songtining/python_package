@@ -64,7 +64,7 @@ def detect_and_overlay(image_path, overlay_image_path, output_path):
 
     # 缩小矩形区域至宽度的一半，只保留右侧部分
     print(">>> 缩小矩形区域，保留右侧部分...")
-    new_width = w // 1.8
+    new_width = w // 2
     x = x + new_width
     w = new_width
     print(f"缩小后的矩形区域: x={x}, y={y}, 宽度={w}, 高度={h}")
