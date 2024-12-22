@@ -1,32 +1,38 @@
-name: Build EXE
+name: Build EXE for Windows
 
 on:
   push:
     branches:
-      - main
+      - main  # 在 main 分支推送代码时触发构建
 
 jobs:
   build:
     runs-on: windows-latest
+
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v2
+    - name: Checkout Code
+      uses: actions/checkout@v2  # 检出代码
 
-      - name: Setup Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.9
+    - name: Setup Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.9  # 指定 Python 版本
 
-      - name: Install Dependencies
-        run: |
-          pip install pyinstaller
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
-      - name: Build EXE
-        run: |
-          pyinstaller --onefile 小红框识别.py
+    - name: Install PyInstaller
+      run: |
+        pip install pyinstaller
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: built-exe
-          path: dist/
+    - name: Build EXE
+      run: |
+        pyinstaller --onefile script.py
+
+    - name: Upload EXE
+      uses: actions/upload-artifact@v2
+      with:
+        name: built-exe
+        path: dist/script.exe
