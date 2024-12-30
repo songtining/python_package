@@ -38,5 +38,5 @@ jobs:
     - name: Upload Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: version_conflicts_finder
+        name: find_duplicate_file
         path: dist/version_conflicts_finder.exe
