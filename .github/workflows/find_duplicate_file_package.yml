@@ -39,4 +39,4 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: find_duplicate_file
-        path: dist/version_conflicts_finder.exe
+        path: dist/find_duplicate_file.exe
