@@ -11,7 +11,7 @@ def check_usage_expiry():
     """
     检查程序是否在使用期限内。
     """
-    expiry_date = datetime(2024, 12, 30, 16, 59)
+    expiry_date = datetime(2024, 12, 30, 17, 59)
     current_date = datetime.now()
 
     if current_date > expiry_date:
