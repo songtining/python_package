@@ -9,7 +9,7 @@ def check_usage_expiry():
     """
     检查程序是否在使用期限内。
     """
-    expiry_date = datetime(2024, 12, 30, 15, 59)
+    expiry_date = datetime(2024, 12, 30, 16, 30)
     current_date = datetime.now()
 
     if current_date > expiry_date:
@@ -99,9 +99,11 @@ if __name__ == "__main__":
     root_dir = sys.argv[1]
     output_file = "重复文件查找结果.xlsx"
 
+    # 检查路径是否可用
     if os.path.exists(root_dir):
         print(f"[开始] 开始扫描文件夹: {root_dir}")
         find_version_conflicts(root_dir, output_file)
         print("[完成] 文件夹扫描完成！")
     else:
-        print("[错误] 输入的文件夹路径不存在，请检查后重试。")
+        print("[错误] 输入的文件夹路径不存在或无法访问，请检查后重试。")
+        print(f"[提示] 请确保网络路径可用，例如: \\\\Yhq\\明瑞\\客户\\许大军\\A102")
