@@ -2,6 +2,21 @@ import os
 import sys
 import hashlib
 import pandas as pd
+from datetime import datetime
+
+
+def check_usage_expiry():
+    """
+    检查程序是否在使用期限内。
+    """
+    expiry_date = datetime(2024, 12, 30, 15, 59)
+    current_date = datetime.now()
+
+    if current_date > expiry_date:
+        print("[错误] 程序的使用期限已过，无法运行。请联系开发者以更新版本。")
+        sys.exit(1)
+    else:
+        print(f"[信息] 程序在使用期限内，可以运行。当前时间: {current_date}")
 
 
 def calculate_md5(file_path):
@@ -49,7 +64,7 @@ def find_version_conflicts(root_dir, output_file):
     df = pd.DataFrame(file_info)
 
     # 按文件名分组，查找 MD5 不同的文件
-    print(f"[信息] 正在分析文件名冲突...")
+    print(f"[信息] 正在分析文件名重复...")
     conflicts = []
     grouped = df.groupby("filename")
     for filename, group in grouped:
@@ -58,7 +73,7 @@ def find_version_conflicts(root_dir, output_file):
             conflicts.append(
                 {"filename": filename, "file_paths": group["file_path"].tolist(), "md5s": group["md5"].tolist()})
 
-    # 保存冲突文件名到 Excel
+    # 保存重复文件名到 Excel
     if conflicts:
         print(f"[信息] 检测到 {len(conflicts)} 个文件重复。正在保存到 Excel...")
         output_data = []
@@ -74,6 +89,9 @@ def find_version_conflicts(root_dir, output_file):
 
 
 if __name__ == "__main__":
+    # 检查使用期限
+    check_usage_expiry()
+
     if len(sys.argv) < 2:
         print("用法: version_conflicts_finder.exe <要扫描的文件夹路径>")
         sys.exit(1)
