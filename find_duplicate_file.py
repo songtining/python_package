@@ -3,20 +3,20 @@ import sys
 import hashlib
 import pandas as pd
 from datetime import datetime
+import tkinter as tk
+from tkinter import filedialog, messagebox
 
 
 def check_usage_expiry():
     """
     检查程序是否在使用期限内。
     """
-    expiry_date = datetime(2024, 12, 30, 16, 30)
+    expiry_date = datetime(2024, 12, 30, 16, 59)
     current_date = datetime.now()
 
     if current_date > expiry_date:
-        print("[错误] 程序的使用期限已过，无法运行。请联系开发者以更新版本。")
+        messagebox.showerror("错误", "程序的使用期限已过，无法运行。请联系开发者以更新版本。")
         sys.exit(1)
-    else:
-        print(f"[信息] 程序在使用期限内，可以运行。当前时间: {current_date}")
 
 
 def calculate_md5(file_path):
@@ -38,10 +38,6 @@ def calculate_md5(file_path):
 def find_version_conflicts(root_dir, output_file):
     """
     找出文件名相同但 MD5 不同的文件，并导出到 Excel 文件。
-
-    参数:
-    - root_dir: 要扫描的文件夹路径。
-    - output_file: 输出的 Excel 文件路径。
     """
     file_info = []  # 保存文件信息
 
@@ -84,26 +80,54 @@ def find_version_conflicts(root_dir, output_file):
         output_df = pd.DataFrame(output_data)
         output_df.to_excel(output_file, index=False)
         print(f"[成功] 重复文件已导出到: {output_file}")
+        messagebox.showinfo("完成", f"重复文件已导出到: {output_file}")
     else:
         print("[信息] 未发现文件名相同但 MD5 不同的文件。")
+        messagebox.showinfo("完成", "未发现文件名相同但 MD5 不同的文件。")
+
+
+def start_scan():
+    """
+    启动扫描操作。
+    """
+    root_dir = folder_path.get()
+    if not root_dir:
+        messagebox.showerror("错误", "请选择要扫描的文件夹路径。")
+        return
+
+    if not os.path.exists(root_dir):
+        messagebox.showerror("错误", "输入的文件夹路径不存在或无法访问，请检查后重试。")
+        return
+
+    output_file = "重复文件查找结果.xlsx"
+    find_version_conflicts(root_dir, output_file)
+
+
+def browse_folder():
+    """
+    选择文件夹。
+    """
+    path = filedialog.askdirectory()
+    folder_path.set(path)
 
 
 if __name__ == "__main__":
     # 检查使用期限
     check_usage_expiry()
 
-    if len(sys.argv) < 2:
-        print("用法: version_conflicts_finder.exe <要扫描的文件夹路径>")
-        sys.exit(1)
+    # 创建主窗口
+    app = tk.Tk()
+    app.title("重复文件查找工具")
+    app.geometry("500x200")
 
-    root_dir = sys.argv[1]
-    output_file = "重复文件查找结果.xlsx"
+    # 文件夹选择
+    folder_path = tk.StringVar()
+    tk.Label(app, text="请选择要扫描的文件夹路径:").pack(pady=10)
+    tk.Entry(app, textvariable=folder_path, width=50).pack(pady=5)
+    tk.Button(app, text="浏览", command=browse_folder).pack(pady=5)
 
-    # 检查路径是否可用
-    if os.path.exists(root_dir):
-        print(f"[开始] 开始扫描文件夹: {root_dir}")
-        find_version_conflicts(root_dir, output_file)
-        print("[完成] 文件夹扫描完成！")
-    else:
-        print("[错误] 输入的文件夹路径不存在或无法访问，请检查后重试。")
-        print(f"[提示] 请确保网络路径可用，例如: \\\\Yhq\\明瑞\\客户\\许大军\\A102")
+    # 开始按钮
+    tk.Button(app, text="开始扫描", command=start_scan, bg="green", fg="white").pack(pady=20)
+
+    # 启动应用
+    app.mainloop()
