@@ -1,4 +1,4 @@
-name: Build Find Duplicate File EXE
+name: Build Calculated Value EXE
 
 on:
   push:
