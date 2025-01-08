@@ -68,7 +68,7 @@ def process_folder(folder_path):
                     # 保存处理结果
                     with open(output_file, 'w', encoding='utf-8') as out_file:
                         for item in new_array:
-                            out_file.write("\t".join(map(str, item)) + "\n")
+                            out_file.write(f"{item[1]}\t{item[3]}\n")
                     logging.info(f"文件 {file_path} 已成功保存为 {output_file}")
                 except Exception as e:
                     logging.error(f"处理文件 {file_path} 时发生错误: {e}")
