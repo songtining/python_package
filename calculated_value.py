@@ -5,6 +5,16 @@ import logging
 from datetime import datetime
 
 
+def check_trial_period():
+    """检查试用时间是否过期"""
+    trial_end = datetime(2025, 1, 9, 12, 0, 0)  # 设置试用截止时间
+    current_time = datetime.now()
+    if current_time > trial_end:
+        messagebox.showerror("试用已结束", "该程序的试用期已结束，感谢您的使用！")
+        logging.warning("试用期已过，程序退出。")
+        exit()
+
+
 def setup_logging():
     # 创建日志文件
     log_file = os.path.join(os.getcwd(), f"processing_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
@@ -95,6 +105,9 @@ def start_processing():
     messagebox.showinfo("完成", "所有文件已处理完成！")
 
 
+# 检查试用时间
+check_trial_period()
+
 # 创建日志系统
 log_file_path = setup_logging()
 
@@ -110,7 +123,7 @@ select_button = tk.Button(root, text="选择文件夹", command=select_folder, w
 select_button.pack(pady=10)
 
 # 显示选择的文件夹路径
-folder_path_label = tk.Label(root, text="未选择文件夹", fg="blue")
+folder_path_label = tk.Label(root, text="未选择文件夹", fg="blue", wraplength=400)
 folder_path_label.pack()
 
 # 开始按钮
