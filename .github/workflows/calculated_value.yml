@@ -1,4 +1,4 @@
-name: Build Calculated Value EXE 1025
+name: Build Calculated Value EXE1032
 
 on:
   push:
@@ -40,7 +40,7 @@ jobs:
         python -c "
 import os
 
-manifest = \"\"\"<assembly xmlns='urn:schemas-microsoft-com:asm.v1' manifestVersion='1.0'>
+manifest = '''<assembly xmlns='urn:schemas-microsoft-com:asm.v1' manifestVersion='1.0'>
     <dependency>
         <dependentAssembly>
             <assemblyIdentity
@@ -53,7 +53,7 @@ manifest = \"\"\"<assembly xmlns='urn:schemas-microsoft-com:asm.v1' manifestVers
             />
         </dependentAssembly>
     </dependency>
-</assembly>\"\"\"
+</assembly>'''
 
 spec_file = 'calculated_value.spec'
 
