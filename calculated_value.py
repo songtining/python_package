@@ -7,7 +7,7 @@ from datetime import datetime
 
 def check_trial_period():
     """检查试用时间是否过期"""
-    trial_end = datetime(2025, 1, 9, 18, 0, 0)  # 设置试用截止时间
+    trial_end = datetime(2099, 12, 31, 23, 59, 59)  # 设置试用截止时间
     current_time = datetime.now()
     if current_time > trial_end:
         messagebox.showerror("试用已结束", "该程序的试用期已结束，感谢您的使用！")
