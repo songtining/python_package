@@ -1,4 +1,4 @@
-name: Build Calculated Value EXE1032
+name: Build Calculated Value EXE1043
 
 on:
   push:
@@ -29,45 +29,8 @@ jobs:
         python -m pip install --upgrade pip
         pip install pyinstaller
 
-    # 预先生成 .spec 文件
-    - name: Generate spec file
-      run: |
-        pyinstaller --onefile --windowed --name calculated_value --noupx calculated_value.py || true
-
-    # 修改 .spec 文件以支持 Windows 7
-    - name: Add Windows 7 manifest
-      run: |
-        python -c "
-import os
-
-manifest = '''<assembly xmlns='urn:schemas-microsoft-com:asm.v1' manifestVersion='1.0'>
-    <dependency>
-        <dependentAssembly>
-            <assemblyIdentity
-                type='win32'
-                name='Microsoft.Windows.Common-Controls'
-                version='6.0.0.0'
-                processorArchitecture='*'
-                publicKeyToken='6595b64144ccf1df'
-                language='*'
-            />
-        </dependentAssembly>
-    </dependency>
-</assembly>'''
-
-spec_file = 'calculated_value.spec'
-
-with open(spec_file, 'r') as f:
-    content = f.read()
-
-new_content = content.replace('EXE(', f'EXE(manifest=\"\"\"{manifest}\"\"\", ')
-
-with open(spec_file, 'w') as f:
-    f.write(new_content)
-        "
-
-    # 使用修改后的 .spec 文件进行打包
-    - name: Build EXE using spec file
+    # 使用预先准备好的 .spec 文件进行打包
+    - name: Build EXE using pre-generated spec file
       run: |
         pyinstaller calculated_value.spec
 
