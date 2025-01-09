@@ -1,4 +1,4 @@
-name: Build Calculated Value EXE1043
+name: Build Calculated Value EXE1115
 
 on:
   push:
@@ -32,7 +32,7 @@ jobs:
     # 使用预先准备好的 .spec 文件进行打包
     - name: Build EXE using pre-generated spec file
       run: |
-        pyinstaller calculated_value.spec  --collect-binaries=all
+        pyinstaller calculated_value.spec --collect-binaries=all --noupx
 
     # 将打包的文件保存到 GitHub Artifact
     - name: Upload Artifact
