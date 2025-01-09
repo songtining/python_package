@@ -73,7 +73,9 @@ def process_folder(folder_path):
                         item[3] = round((max_value - item[2]) * 2 / 0.085, 6)
 
                     # 输出文件路径 # 获取最后一层目录名
+                    logging.info(f"root: {root}")
                     last_folder = root.rstrip("/\\").split("/")[-1] if "/" in root else root.rstrip("/\\").split("\\")[-1]
+                    logging.info(f"last_folder: {last_folder}")
                     output_file = os.path.join(root, f"correct.{last_folder}{file}")
 
                     # 保存处理结果
