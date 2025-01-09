@@ -36,11 +36,10 @@ jobs:
 
     # 修改 .spec 文件以支持 Windows 7
     - name: Modify spec file
+      shell: bash
       run: |
         echo Modifying .spec file for Windows 7 compatibility...
-        powershell -Command "
-          (Get-Content calculated_value.spec) -replace 'EXE\\(', 'EXE\\(\\n    manifest=\"\"\"<assembly xmlns=\\\"urn:schemas-microsoft-com:asm.v1\\\" manifestVersion=\\\"1.0\\\">\\n        <dependency>\\n            <dependentAssembly>\\n                <assemblyIdentity\\n                    type=\\\"win32\\\"\\n                    name=\\\"Microsoft.Windows.Common-Controls\\\"\\n                    version=\\\"6.0.0.0\\\"\\n                    processorArchitecture=\\\"*\\\"\\n                    publicKeyToken=\\\"6595b64144ccf1df\\\"\\n                    language=\\\"*\\\"\\n                />\\n            </dependentAssembly>\\n        </dependency>\\n    </assembly>\\\"\"\"' | Set-Content calculated_value.spec
-        "
+        sed -i 's/EXE(/EXE(\n    manifest="""<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">\n        <dependency>\n            <dependentAssembly>\n                <assemblyIdentity\n                    type="win32"\n                    name="Microsoft.Windows.Common-Controls"\n                    version="6.0.0.0"\n                    processorArchitecture="*"\n                    publicKeyToken="6595b64144ccf1df"\n                    language="*"\n                />\n            </dependentAssembly>\n        </dependency>\n    </assembly>"""/' calculated_value.spec
 
     # 使用修改后的 .spec 文件进行打包
     - name: Build EXE using spec file
