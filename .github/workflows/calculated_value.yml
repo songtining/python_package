@@ -38,23 +38,23 @@ jobs:
     - name: Add Windows 7 manifest
       run: |
         echo Modifying .spec file for Windows 7 compatibility...
-        echo """<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-        <dependency>
-            <dependentAssembly>
-                <assemblyIdentity
-                    type="win32"
-                    name="Microsoft.Windows.Common-Controls"
-                    version="6.0.0.0"
-                    processorArchitecture="*"
-                    publicKeyToken="6595b64144ccf1df"
-                    language="*"
-                />
-            </dependentAssembly>
-        </dependency>
-    </assembly>""" > manifest.txt
-        sed -i '/EXE(/a\    manifest="""' calculated_value.spec
-        sed -i '/manifest="""/r manifest.txt' calculated_value.spec
-        sed -i '/manifest="""/a\    """' calculated_value.spec
+        echo "<assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">" > manifest.txt
+        echo "    <dependency>" >> manifest.txt
+        echo "        <dependentAssembly>" >> manifest.txt
+        echo "            <assemblyIdentity" >> manifest.txt
+        echo "                type=\"win32\"" >> manifest.txt
+        echo "                name=\"Microsoft.Windows.Common-Controls\"" >> manifest.txt
+        echo "                version=\"6.0.0.0\"" >> manifest.txt
+        echo "                processorArchitecture=\"*\"" >> manifest.txt
+        echo "                publicKeyToken=\"6595b64144ccf1df\"" >> manifest.txt
+        echo "                language=\"*\"" >> manifest.txt
+        echo "            />" >> manifest.txt
+        echo "        </dependentAssembly>" >> manifest.txt
+        echo "    </dependency>" >> manifest.txt
+        echo "</assembly>" >> manifest.txt
+        sed -i '/EXE(/a\    manifest=\"\"\"' calculated_value.spec
+        sed -i '/manifest=\"\"\"/r manifest.txt' calculated_value.spec
+        sed -i '/manifest=\"\"\"/a\    \"\"\"' calculated_value.spec
 
     # 使用修改后的 .spec 文件进行打包
     - name: Build EXE using spec file
