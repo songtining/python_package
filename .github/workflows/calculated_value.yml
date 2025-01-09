@@ -32,11 +32,11 @@ jobs:
     # 使用预先准备好的 .spec 文件进行打包
     - name: Build EXE using pre-generated spec file
       run: |
-        pyinstaller calculated_value.spec
+        pyinstaller calculated_value.spec  --collect-binaries=all
 
     # 将打包的文件保存到 GitHub Artifact
     - name: Upload Artifact
       uses: actions/upload-artifact@v3
       with:
         name: calculated_value
-        path: dist/calculated_value/calculated_value.exe
+        path: dist/calculated_value
