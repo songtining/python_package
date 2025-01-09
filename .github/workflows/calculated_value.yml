@@ -39,4 +39,4 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: calculated_value
-        path: dist/calculated_value.exe
+        path: dist/calculated_value/calculated_value.exe
