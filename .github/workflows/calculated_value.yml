@@ -1,4 +1,4 @@
-name: Build Calculated Value EXE 1021
+name: Build Calculated Value EXE 1025
 
 on:
   push:
@@ -37,24 +37,34 @@ jobs:
     # 修改 .spec 文件以支持 Windows 7
     - name: Add Windows 7 manifest
       run: |
-        echo Modifying .spec file for Windows 7 compatibility...
-        echo "manifest = \"\"\"" > manifest_content.py
-        echo "<assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">" >> manifest_content.py
-        echo "    <dependency>" >> manifest_content.py
-        echo "        <dependentAssembly>" >> manifest_content.py
-        echo "            <assemblyIdentity" >> manifest_content.py
-        echo "                type=\"win32\"" >> manifest_content.py
-        echo "                name=\"Microsoft.Windows.Common-Controls\"" >> manifest_content.py
-        echo "                version=\"6.0.0.0\"" >> manifest_content.py
-        echo "                processorArchitecture=\"*\"" >> manifest_content.py
-        echo "                publicKeyToken=\"6595b64144ccf1df\"" >> manifest_content.py
-        echo "                language=\"*\"" >> manifest_content.py
-        echo "            />" >> manifest_content.py
-        echo "        </dependentAssembly>" >> manifest_content.py
-        echo "    </dependency>" >> manifest_content.py
-        echo "</assembly>" >> manifest_content.py
-        echo "\"\"\"" >> manifest_content.py
-        python -c "with open('manifest_content.py', 'r') as mf, open('calculated_value.spec', 'r+') as spec: spec.write(mf.read() + spec.read())"
+        python -c "
+import os
+
+manifest = \"\"\"<assembly xmlns='urn:schemas-microsoft-com:asm.v1' manifestVersion='1.0'>
+    <dependency>
+        <dependentAssembly>
+            <assemblyIdentity
+                type='win32'
+                name='Microsoft.Windows.Common-Controls'
+                version='6.0.0.0'
+                processorArchitecture='*'
+                publicKeyToken='6595b64144ccf1df'
+                language='*'
+            />
+        </dependentAssembly>
+    </dependency>
+</assembly>\"\"\"
+
+spec_file = 'calculated_value.spec'
+
+with open(spec_file, 'r') as f:
+    content = f.read()
+
+new_content = content.replace('EXE(', f'EXE(manifest=\"\"\"{manifest}\"\"\", ')
+
+with open(spec_file, 'w') as f:
+    f.write(new_content)
+        "
 
     # 使用修改后的 .spec 文件进行打包
     - name: Build EXE using spec file
