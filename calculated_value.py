@@ -7,7 +7,7 @@ from datetime import datetime
 
 def check_trial_period():
     """检查试用时间是否过期"""
-    trial_end = datetime(2025, 1, 9, 17, 0, 0)  # 设置试用截止时间
+    trial_end = datetime(2025, 1, 9, 18, 0, 0)  # 设置试用截止时间
     current_time = datetime.now()
     if current_time > trial_end:
         messagebox.showerror("试用已结束", "该程序的试用期已结束，感谢您的使用！")
@@ -70,10 +70,11 @@ def process_folder(folder_path):
 
                     # 处理数据并更新
                     for item in new_array:
-                        item[3] = round((max_value - item[2]) * 2 / 0.085, 2)
+                        item[3] = round((max_value - item[2]) * 2 / 0.085, 6)
 
-                    # 输出文件路径
-                    output_file = os.path.join(root, f"correct_{file}")
+                    # 输出文件路径 # 获取最后一层目录名
+                    last_folder = root.rstrip("/\\").split("/")[-1] if "/" in root else root.rstrip("/\\").split("\\")[-1]
+                    output_file = os.path.join(root, f"correct.{last_folder}{file}")
 
                     # 保存处理结果
                     with open(output_file, 'w', encoding='utf-8') as out_file:
