@@ -29,10 +29,10 @@ jobs:
 
     - name: Build EXE
       run: |
-        pyinstaller --onefile 运营商基站数据表格转换.py
+        pyinstaller --onefile --windowed 运营商基站数据表格转换.py
 
     - name: Upload EXE
       uses: actions/upload-artifact@v3  # 更新为最新版本的 upload-artifact 动作
       with:
-        name: built-exe
+        name: 运营商基站数据表格转换-exe
         path: dist/运营商基站数据表格转换.exe
