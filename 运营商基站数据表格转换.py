@@ -5,6 +5,26 @@ import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from tkinter.ttk import Progressbar, Style
+from datetime import datetime
+
+
+def check_trial_expiry():
+    """检查试用期是否已过期"""
+    expiry_datetime = datetime(2025, 1, 13, 16, 59, 59)  # 设置试用到期日期和时间
+    now = datetime.now()
+    if now > expiry_datetime:
+        messagebox.showerror("试用已过期", "试用期已结束，请联系管理员获取正式版本。")
+        root.destroy()  # 关闭程序
+    else:
+        remaining_time = expiry_datetime - now
+        days_left = remaining_time.days
+        hours, remainder = divmod(remaining_time.seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        trial_label.config(
+            text=f"试用期剩余时间: {days_left}天 {hours}小时 {minutes}分 {seconds}秒"
+        )
+        root.after(1000, check_trial_expiry)  # 每秒钟更新一次
+
 
 def process_excel(input_file, output_file, progress_var, progress_label, output_label):
     # 初始化一个空的 DataFrame 来存储表格2数据
@@ -116,7 +136,7 @@ def start_processing():
 # 创建 GUI 界面
 root = tk.Tk()
 root.title("Excel文件处理工具")
-root.geometry("600x400")
+root.geometry("600x450")
 root.resizable(False, False)
 
 # 样式设置
@@ -125,7 +145,7 @@ style.configure("TProgressbar", thickness=15)
 
 # 文件选择部分
 file_label = tk.Label(root, text="点击下方按钮选择Excel文件", font=("Arial", 12))
-file_label.pack(pady=20)
+file_label.pack(pady=10)
 
 select_button = tk.Button(root, text="选择文件", command=select_file)
 select_button.pack(pady=10)
@@ -133,18 +153,25 @@ select_button.pack(pady=10)
 # 进度条
 progress_var = tk.IntVar()
 progress_bar = Progressbar(root, orient="horizontal", length=400, mode="determinate", variable=progress_var)
-progress_bar.pack(pady=20)
+progress_bar.pack(pady=10)
 
 progress_label = tk.Label(root, text="", font=("Arial", 10), fg="green")
-progress_label.pack(pady=10)
+progress_label.pack(pady=5)
 
 # 输出文件路径显示
 output_label = tk.Label(root, text="", font=("Arial", 10), fg="blue", wraplength=500, justify="center")
 output_label.pack(pady=10)
 
+# 剩余试用期显示
+trial_label = tk.Label(root, text="", font=("Arial", 10), fg="red")
+trial_label.pack(pady=5)
+
+# 检查试用期
+check_trial_expiry()
+
 # 处理按钮
 process_button = tk.Button(root, text="开始处理", state=tk.DISABLED, command=start_processing)
-process_button.pack(pady=20)
+process_button.pack(pady=10)
 
 # 主循环
 root.mainloop()
