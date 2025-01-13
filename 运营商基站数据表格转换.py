@@ -10,7 +10,7 @@ from datetime import datetime
 
 def check_trial_expiry():
     """检查试用期是否已过期"""
-    expiry_datetime = datetime(2025, 1, 13, 16, 59, 59)  # 设置试用到期日期和时间
+    expiry_datetime = datetime(2025, 1, 13, 20, 59, 59)  # 设置试用到期日期和时间
     now = datetime.now()
     if now > expiry_datetime:
         messagebox.showerror("试用已过期", "试用期已结束，请联系管理员获取正式版本。")
@@ -105,6 +105,10 @@ def process_excel(input_file, output_file, progress_var, progress_label, output_
 
     # 对最终的数据按 LAC（必填） 排序
     result_df = result_df.sort_values(by=["CGI（必填，CGI序列或运营商名称）"], ascending=True)
+
+    # 将经纬度列转为字符串格式，保留原始小数位数
+    result_df["基站经度"] = result_df["基站经度"].apply(lambda x: str(x) if pd.notnull(x) else "")
+    result_df["基站纬度"] = result_df["基站纬度"].apply(lambda x: str(x) if pd.notnull(x) else "")
 
     # 写入到本地文件
     result_df.to_excel(output_file, index=False, engine="openpyxl")
