@@ -30,7 +30,7 @@ def check_trial_expiry():
 def deduplicate(df):
     """按 LAC 和 CI 去重，优先保留经纬度不为 0 的数据"""
     deduplicated = []
-    grouped = df.groupby(["LAC（必填）", "CI（必填）"])
+    grouped = df.groupby(["CGI（必填，CGI序列或运营商名称）", "LAC（必填）", "CI（必填）"])
 
     for _, group in grouped:
         # 检查是否存在经纬度不为 0 的行
