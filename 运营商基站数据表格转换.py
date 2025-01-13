@@ -26,6 +26,24 @@ def check_trial_expiry():
         root.after(1000, check_trial_expiry)  # 每秒钟更新一次
 
 
+# 去重处理（按 LAC 和 CI 去重）
+def deduplicate(df):
+    """按 LAC 和 CI 去重，优先保留经纬度不为 0 的数据"""
+    deduplicated = []
+    grouped = df.groupby(["LAC（必填）", "CI（必填）"])
+
+    for _, group in grouped:
+        # 检查是否存在经纬度不为 0 的行
+        valid_rows = group[(group["基站经度"] != 0) & (group["基站纬度"] != 0)]
+        if not valid_rows.empty:
+            # 如果存在经纬度不为 0 的数据，优先保留第一条
+            deduplicated.append(valid_rows.iloc[0])
+        else:
+            # 如果所有行的经纬度均为 0，随机保留一条
+            deduplicated.append(group.iloc[0])
+
+    return pd.DataFrame(deduplicated)
+
 def process_excel(input_file, output_file, progress_var, progress_label, output_label):
     # 初始化一个空的 DataFrame 来存储表格2数据
     columns_table2 = ["CGI（必填，CGI序列或运营商名称）", "LAC（必填）", "CI（必填）",
@@ -62,6 +80,8 @@ def process_excel(input_file, output_file, progress_var, progress_label, output_
         if "lng" not in sheet_df.columns or "lat" not in sheet_df.columns:
             print(f"Sheet 页 {sheet_name} 缺少经纬度列，跳过处理。")
             continue
+
+        # 提取经纬度列
         lng_col = sheet_df["lng"]
         lat_col = sheet_df["lat"]
 
@@ -81,7 +101,10 @@ def process_excel(input_file, output_file, progress_var, progress_label, output_
         result_df = pd.concat([result_df, transformed_df], ignore_index=True)
 
     # 去重处理（按 LAC 和 CI 去重）
-    result_df = result_df.drop_duplicates(subset=["LAC（必填）", "CI（必填）"])
+    result_df = deduplicate(result_df)
+
+    # 对最终的数据按 LAC（必填） 排序
+    result_df = result_df.sort_values(by=["CGI（必填，CGI序列或运营商名称）"], ascending=True)
 
     # 写入到本地文件
     result_df.to_excel(output_file, index=False, engine="openpyxl")
