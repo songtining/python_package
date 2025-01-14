@@ -29,7 +29,7 @@ jobs:
 
     - name: Build EXE for Windows 7
       run: |
-        pyinstaller --onefile --windowed --name 运营商基站数据表格转换 --noupx --add-data "python38.dll;." 运营商基站数据表格转换.py
+        pyinstaller --onefile --windowed --name 运营商基站数据表格转换 --noupx --add-data "C:/hostedtoolcache/windows/Python/3.8.10/x64/python38.dll;." 运营商基站数据表格转换.py
 
     - name: Upload EXE
       uses: actions/upload-artifact@v3  # 更新为最新版本的 upload-artifact 动作
