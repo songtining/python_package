@@ -10,7 +10,7 @@ from datetime import datetime
 
 def check_trial_expiry():
     """检查试用期是否已过期"""
-    expiry_datetime = datetime(2025, 1, 13, 20, 59, 59)  # 设置试用到期日期和时间
+    expiry_datetime = datetime(2025, 1, 14, 11, 59, 59)  # 设置试用到期日期和时间
     now = datetime.now()
     if now > expiry_datetime:
         messagebox.showerror("试用已过期", "试用期已结束，请联系管理员获取正式版本。")
