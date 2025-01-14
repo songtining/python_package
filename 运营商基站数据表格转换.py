@@ -44,6 +44,7 @@ def deduplicate(df):
 
     return pd.DataFrame(deduplicated)
 
+
 # CGI 对应关系字典
 CGI_MAPPING = {
     "ChinaMobileGsm": "移动2G",
@@ -59,14 +60,19 @@ CGI_MAPPING = {
     "ChinaTelecomNR": "电信5G"
 }
 
+
 def process_excel(input_file, output_file, progress_var, progress_label, output_label):
     # 初始化一个空的 DataFrame 来存储表格2数据
     columns_table2 = ["CGI（必填，CGI序列或运营商名称）", "LAC（必填）", "CI（必填）",
                       "基站类型（必填）", "基站经度", "基站纬度", "基站名称", "基站地址"]
     result_df = pd.DataFrame(columns=columns_table2)
 
+    # 判断文件扩展名以选择合适的 engine
+    file_extension = os.path.splitext(input_file)[1].lower()
+    engine = "openpyxl" if file_extension == ".xlsx" else "xlrd"
+
     # 读取表格1中的所有 sheet 页
-    sheets = pd.ExcelFile(input_file)
+    sheets = pd.ExcelFile(input_file, engine=engine)
     total_sheets = len(sheets.sheet_names)
     for idx, sheet_name in enumerate(sheets.sheet_names, start=1):
         if sheet_name == 'WIFI':
@@ -77,16 +83,19 @@ def process_excel(input_file, output_file, progress_var, progress_label, output_
         root.update_idletasks()
 
         # 读取每个 sheet 页
-        sheet_df = pd.read_excel(input_file, sheet_name=sheet_name)
+        sheet_df = pd.read_excel(input_file, sheet_name=sheet_name, engine=engine)
 
-        # CGI 值来源于 sheet 页名称的前两个字符
-        # cgi_value = sheet_name[:2]
-        # CGI 值来源于映射关系，如果找不到，使用 sheet_name
+        # CGI 值来源于映射关系
         cgi_value = CGI_MAPPING.get(sheet_name, '')
         if cgi_value != '':
-            cgi_value = cgi_value[:2]
+            cgi_value = cgi_value[:2]  # 截取映射值前两个字符
         else:
-            cgi_value = sheet_name
+            # 如果映射表中不存在
+            if any(keyword in sheet_name for keyword in ["移动", "电信", "联通"]):
+                # 保留包含 "移动"、"电信"、"联通" 的部分
+                cgi_value = next((keyword for keyword in ["移动", "电信", "联通"] if keyword in sheet_name), sheet_name)
+            else:
+                cgi_value = sheet_name
 
         # 检查列的数量是否足够
         if sheet_df.shape[1] < 3:
@@ -154,9 +163,9 @@ def process_excel(input_file, output_file, progress_var, progress_label, output_
     output_label.config(text=f"文件已保存到: {output_file}")
     messagebox.showinfo("完成", f"处理后的文件已成功处理并保存到 {output_file}")
 
-
 def select_file():
-    file_path = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xlsx")])
+    # 修改文件选择对话框，支持 .xls 和 .xlsx 格式
+    file_path = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xls *.xlsx")])
     if file_path:
         file_label.config(text=f"已选择文件: {file_path}")
         process_button.config(state=tk.NORMAL)
