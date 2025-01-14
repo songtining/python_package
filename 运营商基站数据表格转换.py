@@ -10,7 +10,7 @@ from datetime import datetime
 
 def check_trial_expiry():
     """检查试用期是否已过期"""
-    expiry_datetime = datetime(2025, 1, 14, 11, 59, 59)  # 设置试用到期日期和时间
+    expiry_datetime = datetime(2025, 1, 14, 14, 59, 59)  # 设置试用到期日期和时间
     now = datetime.now()
     if now > expiry_datetime:
         messagebox.showerror("试用已过期", "试用期已结束，请联系管理员获取正式版本。")
@@ -44,6 +44,21 @@ def deduplicate(df):
 
     return pd.DataFrame(deduplicated)
 
+# CGI 对应关系字典
+CGI_MAPPING = {
+    "ChinaMobileGsm": "移动2G",
+    "ChinaMobileTdscdma": "移动3G",
+    "ChinaMobileLte": "移动4G",
+    "ChinaMobileNR": "移动5G",
+    "ChinaUnionGsm": "联通2G",
+    "ChinaUnionWcdma": "联通3G",
+    "ChinaUnionLte": "联通4G",
+    "ChinaUnionNR": "联通5G",
+    "ChinaTelecomCdma": "电信2G3G",
+    "ChinaTelecomLte": "电信4G",
+    "ChinaTelecomNR": "电信5G"
+}
+
 def process_excel(input_file, output_file, progress_var, progress_label, output_label):
     # 初始化一个空的 DataFrame 来存储表格2数据
     columns_table2 = ["CGI（必填，CGI序列或运营商名称）", "LAC（必填）", "CI（必填）",
@@ -65,7 +80,13 @@ def process_excel(input_file, output_file, progress_var, progress_label, output_
         sheet_df = pd.read_excel(input_file, sheet_name=sheet_name)
 
         # CGI 值来源于 sheet 页名称的前两个字符
-        cgi_value = sheet_name[:2]
+        # cgi_value = sheet_name[:2]
+        # CGI 值来源于映射关系，如果找不到，使用 sheet_name
+        cgi_value = CGI_MAPPING.get(sheet_name, '')
+        if cgi_value != '':
+            cgi_value = cgi_value[:2]
+        else:
+            cgi_value = sheet_name
 
         # 检查列的数量是否足够
         if sheet_df.shape[1] < 3:
@@ -102,6 +123,9 @@ def process_excel(input_file, output_file, progress_var, progress_label, output_
 
     # 去重处理（按 LAC 和 CI 去重）
     result_df = deduplicate(result_df)
+
+    # 移除 LAC 和 CI 都为 0 的无效数据
+    result_df = result_df[(result_df["LAC（必填）"] != 0) | (result_df["CI（必填）"] != 0)]
 
     # 对最终的数据按 LAC（必填） 排序
     result_df = result_df.sort_values(by=["CGI（必填，CGI序列或运营商名称）"], ascending=True)
