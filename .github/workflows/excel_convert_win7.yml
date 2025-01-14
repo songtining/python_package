@@ -1,0 +1,38 @@
+name: Build 运营商基站数据表格转换 for Windows 7
+
+on:
+  push:
+    branches:
+      - main  # 在 main 分支推送代码时触发构建
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3  # 更新为最新版本的 checkout 动作
+
+    - name: Setup Python
+      uses: actions/setup-python@v4  # 更新为最新版本的 setup-python 动作
+      with:
+        python-version: 3.8  # 指定 Python 3.8（Windows 7 推荐版本）
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Install PyInstaller
+      run: |
+        pip install pyinstaller
+
+    - name: Build EXE for Windows 7
+      run: |
+        pyinstaller --onefile --windowed --name 运营商基站数据表格转换 --noupx --add-data "python38.dll;." 运营商基站数据表格转换.py
+
+    - name: Upload EXE
+      uses: actions/upload-artifact@v3  # 更新为最新版本的 upload-artifact 动作
+      with:
+        name: 运营商基站数据表格转换-exe
+        path: dist/运营商基站数据表格转换.exe
