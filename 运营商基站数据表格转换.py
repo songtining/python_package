@@ -176,7 +176,7 @@ def start_processing():
 # 创建 GUI 界面
 root = tk.Tk()
 root.title("Excel文件处理工具")
-root.geometry("600x450")
+root.geometry("600x400")
 root.resizable(False, False)
 
 # 样式设置
@@ -201,10 +201,6 @@ progress_label.pack(pady=5)
 # 输出文件路径显示
 output_label = tk.Label(root, text="", font=("Arial", 10), fg="blue", wraplength=500, justify="center")
 output_label.pack(pady=10)
-
-# 剩余试用期显示
-trial_label = tk.Label(root, text="", font=("Arial", 10), fg="red")
-trial_label.pack(pady=5)
 
 # 处理按钮
 process_button = tk.Button(root, text="开始处理", state=tk.DISABLED, command=start_processing)
