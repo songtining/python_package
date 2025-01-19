@@ -1,10 +1,11 @@
 import os
 import tkinter as tk
-from tkinter import filedialog, messagebox, StringVar, OptionMenu
+from tkinter import filedialog, messagebox, StringVar, OptionMenu, IntVar, Checkbutton
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from tkinter.ttk import Progressbar, Style
+
 
 # 去重处理（按 LAC 和 CI 去重）
 def deduplicate(df):
@@ -143,6 +144,7 @@ def process_excel(input_file, output_file, progress_var, progress_label, output_
     output_label.config(text=f"文件已保存到: {output_file}")
     messagebox.showinfo("完成", f"处理后的文件已成功处理并保存到 {output_file}")
 
+
 def process_excel_format2(input_file, output_file, progress_var, progress_label, output_label):
     # 初始化一个空的 DataFrame 来存储表格2数据
     columns_table2 = ["CGI（必填，CGI序列或运营商名称）", "LAC（必填）", "CI（必填）",
@@ -173,6 +175,8 @@ def process_excel_format2(input_file, output_file, progress_var, progress_label,
         longitude_column = [col for col in df.columns if coordinates_header in col and "经度" in col]
         latitude_column = [col for col in df.columns if coordinates_header in col and "纬度" in col]
 
+    total_sheets = len(valid_headers) - 1
+    idx = 0
     # 用于存储结果的列表
     merged_data = []
     # 打印每个一级表头对应的数据
@@ -182,6 +186,12 @@ def process_excel_format2(input_file, output_file, progress_var, progress_label,
             continue
 
         print(f"\n数据对应表头: {header}")
+        # 更新进度条
+        idx += 1
+        progress_var.set(int((idx / total_sheets) * 100))
+        progress_label.config(text=f"正在处理: {header} ({idx}/{total_sheets})")
+        root.update_idletasks()
+
         # 筛选该一级表头对应的所有列
         selected_columns = [col for col in df.columns if col.startswith(header)]
 
@@ -216,28 +226,11 @@ def process_excel_format2(input_file, output_file, progress_var, progress_label,
     merged_df = pd.DataFrame(merged_data)
 
     # 去重处理（按 LAC 和 CI 去重）
-    def deduplicate(df):
-        """按 LAC 和 CI 去重，优先保留经纬度不为 0 的数据"""
-        deduplicated = []
-        grouped = df.groupby(["CGI（必填，CGI序列或运营商名称）", "LAC（必填）", "CI（必填）"])
-
-        for _, group in grouped:
-            # 检查是否存在经纬度不为 0 的行
-            valid_rows = group[(group["基站经度"] != 0) & (group["基站纬度"] != 0)]
-            if not valid_rows.empty:
-                # 如果存在经纬度不为 0 的数据，优先保留第一条
-                deduplicated.append(valid_rows.iloc[0])
-            else:
-                # 如果所有行的经纬度均为 0，随机保留一条
-                deduplicated.append(group.iloc[0])
-
-        return pd.DataFrame(deduplicated)
-
-    # 去重处理（按 LAC 和 CI 去重）
     merged_df = deduplicate(merged_df)
 
     # 移除 LAC 和 CI 都为 0 的无效数据
     merged_df = merged_df[(merged_df["LAC（必填）"] != 0) | (merged_df["CI（必填）"] != 0)]
+    merged_df = merged_df[(merged_df["LAC（必填）"] != '--') | (merged_df["CI（必填）"] != '--')]
 
     # 对最终的数据按 LAC（必填） 排序
     merged_df = merged_df.sort_values(by=["CGI（必填，CGI序列或运营商名称）"], ascending=True)
@@ -267,6 +260,7 @@ def process_excel_format2(input_file, output_file, progress_var, progress_label,
     output_label.config(text=f"文件已保存到: {output_file}")
     messagebox.showinfo("完成", f"处理后的文件已成功处理并保存到 {output_file}")
 
+
 def select_file():
     # 修改文件选择对话框，支持 .xls 和 .xlsx 格式
     file_path = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xls *.xlsx")])
@@ -285,7 +279,12 @@ def start_processing():
         messagebox.showwarning("警告", "未选择有效的输入文件！")
         return
 
-    if file_type_var == "格式1(多页)":
+    # 获取选择的文件类型
+    if format1_var.get() and format2_var.get():
+        messagebox.showwarning("警告", "只能选择一个文件格式！")
+        return
+
+    if format1_var.get():
         # 输出文件路径：与输入文件同级目录，文件名格式为“输入文件名_基站信息导入.xlsx”
         output_file = os.path.join(
             os.path.dirname(input_file),
@@ -296,7 +295,7 @@ def start_processing():
             process_excel(input_file, output_file, progress_var, progress_label, output_label)
         except Exception as e:
             messagebox.showerror("错误", f"处理文件时出错: {e}")
-    elif file_type_var == "格式2(多级表头)":
+    elif format2_var.get():
         # 输出文件路径：与输入文件同级目录，文件名格式为“输入文件名_基站信息导入.xlsx”
         output_file = os.path.join(
             os.path.dirname(input_file),
@@ -306,6 +305,8 @@ def start_processing():
             process_excel_format2(input_file, output_file, progress_var, progress_label, output_label)
         except Exception as e:
             messagebox.showerror("错误", f"处理文件时出错: {e}")
+    else:
+        messagebox.showwarning("警告", "未选择文件格式！")
 
 
 # 创建 GUI 界面
@@ -326,13 +327,17 @@ select_button = tk.Button(root, text="选择文件", command=select_file)
 select_button.pack(pady=10)
 
 # 文件选择部分
-file_label = tk.Label(root, text="请选择输入的Excel文件数据格式", font=("Arial", 12))
+file_label = tk.Label(root, text="请选择Excel文件数据格式", font=("Arial", 12))
 file_label.pack(pady=10)
-# 文件类型选择
-file_type_var = StringVar(root)
-file_type_var.set("格式1(多页)")  # 默认选择“格式1”
-file_type_menu = OptionMenu(root, file_type_var, "格式1(多页)", "格式2(多级表头)")
-file_type_menu.pack(pady=20)
+
+# 创建复选框用于选择格式
+format1_var = IntVar(root)
+format2_var = IntVar(root)
+# 格式选择复选框
+format1_checkbox = Checkbutton(root, text="格式1(多页)", variable=format1_var)
+format2_checkbox = Checkbutton(root, text="格式2(多级表头)", variable=format2_var)
+format1_checkbox.pack(pady=5)
+format2_checkbox.pack(pady=5)
 
 # 进度条
 progress_var = tk.IntVar()
