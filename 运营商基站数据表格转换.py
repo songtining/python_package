@@ -5,7 +5,7 @@ import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from tkinter.ttk import Progressbar, Style
-
+from datetime import datetime
 
 # 去重处理（按 LAC 和 CI 去重）
 def deduplicate(df):
@@ -157,7 +157,7 @@ def process_excel_format2(input_file, output_file, progress_var, progress_label,
 
     # 使用 pandas 读取 Excel 文件，指定前两行作为表头
     # df = pd.read_excel(input_file, header=[0, 1], engine=engine)  # 如果是 .xlsx 文件
-    
+
     # 使用 pd.ExcelFile 读取文件
     xls = pd.ExcelFile(input_file, engine=engine)
     # 假设我们要读取文件中的第一个工作表，使用 header=[0, 1] 合并前两行表头
@@ -360,6 +360,32 @@ output_label.pack(pady=10)
 # 处理按钮
 process_button = tk.Button(root, text="开始处理", state=tk.DISABLED, command=start_processing)
 process_button.pack(pady=10)
+
+# 剩余试用期显示
+trial_label = tk.Label(root, text="", font=("Arial", 10), fg="red")
+trial_label.pack(pady=10)
+
+# 设置试用期的结束日期
+expiry_datetime = datetime(2025, 1, 20, 12, 00, 00)  # 设置试用期的结束日期
+
+def check_trial_expiry():
+    """检查试用期是否已过期"""
+    now = datetime.now()
+    if now > expiry_datetime:
+        messagebox.showerror("试用已过期", "试用期已结束，请联系管理员获取正式版本。")
+        root.quit()  # 关闭程序
+    else:
+        remaining_time = expiry_datetime - now
+        days_left = remaining_time.days
+        hours, remainder = divmod(remaining_time.seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        trial_label.config(
+            text=f"试用期剩余时间: {days_left}天 {hours}小时 {minutes}分 {seconds}秒"
+        )
+        root.after(1000, check_trial_expiry)  # 每秒钟更新一次
+
+# 检查试用期
+check_trial_expiry()
 
 # 主循环
 root.mainloop()
