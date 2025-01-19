@@ -156,7 +156,13 @@ def process_excel_format2(input_file, output_file, progress_var, progress_label,
     engine = "openpyxl" if file_extension == ".xlsx" else "xlrd"
 
     # 使用 pandas 读取 Excel 文件，指定前两行作为表头
-    df = pd.read_excel(input_file, header=[0, 1], engine=engine)  # 如果是 .xlsx 文件
+    # df = pd.read_excel(input_file, header=[0, 1], engine=engine)  # 如果是 .xlsx 文件
+    
+    # 使用 pd.ExcelFile 读取文件
+    xls = pd.ExcelFile(input_file, engine=engine)
+    # 假设我们要读取文件中的第一个工作表，使用 header=[0, 1] 合并前两行表头
+    df = xls.parse(sheet_name=0, header=[0, 1])
+
     # 扁平化多级表头为单级表头，组合第一行和第二行
     df.columns = ['_'.join(col).strip() for col in df.columns.values]
 
