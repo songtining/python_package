@@ -365,27 +365,5 @@ process_button.pack(pady=10)
 trial_label = tk.Label(root, text="", font=("Arial", 10), fg="red")
 trial_label.pack(pady=10)
 
-# 设置试用期的结束日期
-expiry_datetime = datetime(2025, 1, 20, 12, 00, 00)  # 设置试用期的结束日期
-
-def check_trial_expiry():
-    """检查试用期是否已过期"""
-    now = datetime.now()
-    if now > expiry_datetime:
-        messagebox.showerror("试用已过期", "试用期已结束，请联系管理员获取正式版本。")
-        root.quit()  # 关闭程序
-    else:
-        remaining_time = expiry_datetime - now
-        days_left = remaining_time.days
-        hours, remainder = divmod(remaining_time.seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        trial_label.config(
-            text=f"试用期剩余时间: {days_left}天 {hours}小时 {minutes}分 {seconds}秒"
-        )
-        root.after(1000, check_trial_expiry)  # 每秒钟更新一次
-
-# 检查试用期
-check_trial_expiry()
-
 # 主循环
 root.mainloop()
