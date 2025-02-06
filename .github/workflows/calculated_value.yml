@@ -36,7 +36,7 @@ jobs:
 
     # 将打包的文件保存到 GitHub Artifact
     - name: Upload Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: calculated_value
         path: dist/calculated_value.exe
