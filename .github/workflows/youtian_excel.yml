@@ -11,10 +11,10 @@ jobs:
 
     steps:
     - name: Checkout Code
-      uses: actions/checkout@v3  # 更新为最新版本的 checkout 动作
+      uses: actions/checkout@v3  # 使用最新版本的 checkout 动作
 
     - name: Setup Python
-      uses: actions/setup-python@v4  # 更新为最新版本的 setup-python 动作
+      uses: actions/setup-python@v4  # 使用最新版本的 setup-python 动作
       with:
         python-version: 3.9  # 指定 Python 版本
 
@@ -29,7 +29,7 @@ jobs:
       run: |
         pyinstaller --onefile --windowed youtian_excel.py
     - name: Upload EXE
-      uses: actions/upload-artifact@v2  # 更新为最新版本的 upload-artifact 动作
+      uses: actions/upload-artifact@v3  # 更新为 v3 版本
       with:
         name: youtian_excel-exe
         path: dist/youtian_excel.exe
