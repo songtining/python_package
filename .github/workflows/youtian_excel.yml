@@ -32,7 +32,7 @@ jobs:
         pyinstaller --onefile --windowed youtian_excel.py
 
     - name: Upload EXE
-      uses: actions/upload-artifact@v3  # 更新为最新版本的 upload-artifact 动作
+      uses: actions/upload-artifact@v2  # 更新为最新版本的 upload-artifact 动作
       with:
         name: 油田电子表数据处理-exe
         path: dist/油田电子表数据处理.exe
