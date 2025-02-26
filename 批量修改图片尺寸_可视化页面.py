@@ -210,6 +210,9 @@ def countdown_timer(label):
         remaining_time = TRIAL_END_TIME - now
         if remaining_time.total_seconds() <= 0:
             label.config(text="试用时间已结束!", fg="red")
+            folder_button.config(state="disabled")  # 禁用按钮
+            start_button.config(state="disabled")  # 禁用按钮
+            stop_button.config(state="disabled")  # 禁用按钮
             return
         days, remainder = divmod(remaining_time.total_seconds(), 86400)
         hours, remainder = divmod(remainder, 3600)
