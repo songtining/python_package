@@ -258,7 +258,7 @@ log_queue = queue.Queue()
 
 # **GUI界面**
 root = Tk()
-root.title("图片尺寸调整小工具-试用版V1.0")
+root.title("图片尺寸调整小工具-试用版V2.0")
 root.geometry("600x600")
 
 # 选择文件夹按钮
