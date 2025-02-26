@@ -3,6 +3,7 @@ import re
 import time
 import datetime
 import logging
+import json
 from logging.handlers import RotatingFileHandler
 import threading
 from tkinter import *
@@ -11,13 +12,32 @@ from PIL import Image
 
 # **全局变量**
 folder_path = ""
-TRIAL_END_TIME = datetime.datetime(2025, 2, 26, 23, 59, 59)  # 试用截止时间
+TRIAL_END_TIME = datetime.datetime(2025, 2, 26, 11, 59, 59)  # 试用截止时间
 LOG_FILE = "processing_log.txt"  # 日志文件路径
 MAX_LOG_FILE_SIZE = 20 * 1024 * 1024  # 5 MB 日志文件大小限制
 stop_processing = False  # 停止处理的标志
 MAX_LOG_LINES = 500  # 日志最多显示 1000 行
 processing_thread = None  # 处理线程
 scan_timer = None  # 定时器
+CONFIG_FILE = "config.json"  # 配置文件路径
+
+
+# **读取配置文件**
+def load_config():
+    """ 读取配置文件，获取默认文件夹路径 """
+    global folder_path
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r") as config_file:
+            try:
+                config = json.load(config_file)
+                folder_path = config.get("folder_path", "")
+                write_log(f"🔧 已加载配置文件，默认文件夹路径：{folder_path}")
+                folder_label.config(text=f"已加载默认配置文件夹: {folder_path}")  # 显示加载后的路径
+                start_button.config(state=NORMAL)  # 启用“开始处理”按钮
+            except json.JSONDecodeError:
+                write_log("⚠️ 配置文件格式错误，请重新配置或手动选择文件夹")
+    else:
+        write_log("⚠️ 配置文件不存在，请重新配置或手动选择文件夹")
 
 
 # **设置日志文件**
@@ -28,7 +48,7 @@ def setup_logging():
 
     log_file_path = os.path.join("logs", LOG_FILE)
 
-    handler = logging.handlers.RotatingFileHandler(log_file_path, maxBytes=MAX_LOG_FILE_SIZE, backupCount=5)
+    handler = RotatingFileHandler(log_file_path, maxBytes=MAX_LOG_FILE_SIZE, backupCount=5)
     handler.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
@@ -73,6 +93,11 @@ def extract_dimensions_from_folder_name(folder_name):
 def process_images_in_folder(folder_path):
     """ 读取文件夹名称提取尺寸，并批量调整图片大小（不保持比例，直接拉伸变形），转换为CMYK颜色模式 """
     global stop_processing
+
+    try:
+        os.listdir(folder_path)
+    except Exception as e:
+        write_log(f"❌ 文件目录 {folder_path} 读取失败: {e}")
 
     for folder_name in os.listdir(folder_path):
         subfolder_path = os.path.join(folder_path, folder_name)
@@ -218,6 +243,9 @@ threading.Thread(target=countdown_timer, args=(time_label,)).start()
 
 # 启动日志配置
 setup_logging()
+
+# 加载配置文件
+load_config()
 
 # 运行界面
 root.mainloop()
