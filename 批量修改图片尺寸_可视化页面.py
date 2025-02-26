@@ -75,8 +75,8 @@ def write_log(message):
     logging.info(formatted_message)
 
 
-def cm_to_pixels(cm, dpi=96):
-    """ 将厘米转换为像素（默认 96 DPI）"""
+def cm_to_pixels(cm, dpi=72):
+    """ 将厘米转换为像素（默认 72 DPI）"""
     return int(cm * dpi / 2.54)  # 1 英寸 = 2.54cm
 
 
