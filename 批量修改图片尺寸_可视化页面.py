@@ -12,7 +12,7 @@ from PIL import Image
 
 # **全局变量**
 folder_path = ""
-TRIAL_END_TIME = datetime.datetime(2025, 2, 27, 11, 59, 59)  # 试用截止时间
+TRIAL_END_TIME = datetime.datetime(2025, 2, 26, 16, 59, 59)  # 试用截止时间
 LOG_FILE = "processing_log.txt"  # 日志文件路径
 MAX_LOG_FILE_SIZE = 20 * 1024 * 1024  # 5 MB 日志文件大小限制
 stop_processing = False  # 停止处理的标志
