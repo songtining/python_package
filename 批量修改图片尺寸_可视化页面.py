@@ -6,13 +6,14 @@ import logging
 import json
 from logging.handlers import RotatingFileHandler
 import threading
+import queue
 from tkinter import *
 from tkinter import filedialog, scrolledtext
 from PIL import Image
 
 # **全局变量**
 folder_path = ""
-TRIAL_END_TIME = datetime.datetime(2025, 2, 26, 16, 59, 59)  # 试用截止时间
+TRIAL_END_TIME = datetime.datetime(2025, 2, 26, 17, 59, 59)  # 试用截止时间
 LOG_FILE = "processing_log.txt"  # 日志文件路径
 MAX_LOG_FILE_SIZE = 20 * 1024 * 1024  # 5 MB 日志文件大小限制
 stop_processing = False  # 停止处理的标志
@@ -64,16 +65,25 @@ def write_log(message):
     # 添加当前时间信息
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     formatted_message = f"[{current_time}] {message}"
+    log_queue.put(formatted_message)
 
     # 检查日志行数，超过 1000 行则清空
     if int(log_text.index('end-1c').split('.')[0]) >= MAX_LOG_LINES:
         log_text.delete(1.0, END)  # 清空日志框
 
     # 显示日志
-    log_text.insert(END, formatted_message + '\n')
-    log_text.yview(END)  # 滚动到最底部
+    #log_text.insert(END, formatted_message + '\n')
+    #log_text.yview(END)  # 滚动到最底部
     logging.info(formatted_message)
 
+def update_log_window():
+    """ 在主线程更新日志 """
+    while not log_queue.empty():
+        message = log_queue.get()
+        log_text.insert('end', message + '\n')
+        log_text.yview('end')  # 滚动到最底部
+        log_text.update_idletasks()  # 刷新 GUI 更新
+    log_text.after(500, update_log_window)  # 每100毫秒检查一次更新
 
 def cm_to_pixels(cm, dpi=72):
     """ 将厘米转换为像素（默认 72 DPI）"""
@@ -90,14 +100,49 @@ def extract_dimensions_from_folder_name(folder_name):
     return None
 
 
+def convert_rgb_to_cmyk(image):
+    """ 将RGB图像转换为CMYK """
+    width, height = image.size
+    cmyk_image = Image.new("CMYK", (width, height))
+    pixels = image.load()
+    cmyk_pixels = cmyk_image.load()
+
+    # 执行RGB到CMYK的转换
+    for i in range(width):
+        for j in range(height):
+            r, g, b = pixels[i, j]  # 获取每个像素的RGB值
+
+            # 归一化RGB到[0, 1]
+            r /= 255.0
+            g /= 255.0
+            b /= 255.0
+
+            # 计算C, M, Y
+            c = 1 - r
+            m = 1 - g
+            y = 1 - b
+
+            # 计算K
+            k = min(c, m, y)
+
+            # 修正C, M, Y
+            if k < 1:
+                c = (c - k) / (1 - k)
+                m = (m - k) / (1 - k)
+                y = (y - k) / (1 - k)
+            else:
+                c = m = y = 0
+
+            # 将C, M, Y, K映射回[0, 255]
+            cmyk_pixels[i, j] = (int(c * 255), int(m * 255), int(y * 255), int(k * 255))
+
+    return cmyk_image
+
 def process_images_in_folder(folder_path):
     """ 读取文件夹名称提取尺寸，并批量调整图片大小（不保持比例，直接拉伸变形），转换为CMYK颜色模式 """
     global stop_processing
 
-    try:
-        os.listdir(folder_path)
-    except Exception as e:
-        write_log(f"❌ 文件目录 {folder_path} 读取失败: {e}")
+    write_log(f"📏 处理文件夹: {folder_path} 开始 ******************************** ")
 
     for folder_name in os.listdir(folder_path):
         subfolder_path = os.path.join(folder_path, folder_name)
@@ -116,12 +161,13 @@ def process_images_in_folder(folder_path):
             write_log(f"📏 处理文件夹: {folder_name}, 目标尺寸: {target_width}x{target_height} 像素")
 
             for filename in os.listdir(subfolder_path):
+
                 if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.gif')):
                     image_path = os.path.join(subfolder_path, filename)
 
                     try:
                         with Image.open(image_path) as image:
-                            image = image.convert("CMYK")  # **转换为CMYK模式**
+                            image = image.convert("RGB")  # **确保为RGB模式**
 
                             # **判断图片尺寸是否已经符合要求**
                             if image.size == (target_width, target_height):
@@ -133,8 +179,11 @@ def process_images_in_folder(folder_path):
                             # **拉伸变形缩放**
                             resized_image = image.resize((target_width, target_height), Image.LANCZOS)
 
+                            # **转换为CMYK**
+                            cmyk_image = convert_rgb_to_cmyk(resized_image)
+
                             # **保存**
-                            resized_image.save(image_path)
+                            cmyk_image.save(image_path)
                             write_log(f"✅ 已调整并覆盖: {image_path}")
 
                     except Exception as e:
@@ -148,7 +197,7 @@ def process_images_in_folder(folder_path):
     if not stop_processing:
         # 继续扫描，设置定时器每5秒调用一次
         global scan_timer
-        scan_timer = threading.Timer(5, process_images_in_folder, args=(folder_path,))
+        scan_timer = threading.Timer(10, process_images_in_folder, args=(folder_path,))
         scan_timer.start()
     else:
         write_log("🚫 已停止文件扫描和处理")
@@ -204,6 +253,8 @@ def stop_processing_function():
     else:
         write_log("🚫 没有正在运行的扫描")
 
+# 创建队列
+log_queue = queue.Queue()
 
 # **GUI界面**
 root = Tk()
@@ -237,6 +288,9 @@ end_time_label.pack()
 # 日志显示框
 log_text = scrolledtext.ScrolledText(root, width=90, height=30, wrap=WORD, font=("Arial", 12))
 log_text.pack(pady=10)
+
+# 启动日志更新线程
+log_text.after(500, update_log_window)
 
 # 启动倒计时线程
 threading.Thread(target=countdown_timer, args=(time_label,)).start()
