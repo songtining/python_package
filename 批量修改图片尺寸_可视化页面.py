@@ -13,7 +13,7 @@ from PIL import Image
 
 # **全局变量**
 folder_path = ""
-TRIAL_END_TIME = datetime.datetime(2025, 2, 26, 17, 59, 59)  # 试用截止时间
+TRIAL_END_TIME = datetime.datetime(2025, 2, 27, 12, 59, 59)  # 试用截止时间
 LOG_FILE = "processing_log.txt"  # 日志文件路径
 MAX_LOG_FILE_SIZE = 20 * 1024 * 1024  # 5 MB 日志文件大小限制
 stop_processing = False  # 停止处理的标志
@@ -102,41 +102,53 @@ def extract_dimensions_from_folder_name(folder_name):
 
 def convert_rgb_to_cmyk(image):
     """ 将RGB图像转换为CMYK """
-    width, height = image.size
-    cmyk_image = Image.new("CMYK", (width, height))
-    pixels = image.load()
-    cmyk_pixels = cmyk_image.load()
+    if image.mode != 'RGB':
+        image = image.convert('RGB')
 
-    # 执行RGB到CMYK的转换
-    for i in range(width):
-        for j in range(height):
-            r, g, b = pixels[i, j]  # 获取每个像素的RGB值
+    # 步骤1：转换为 CMYK（无 ICC 校准）
+    cmyk_img = image.convert('CMYK')
 
-            # 归一化RGB到[0, 1]
-            r /= 255.0
-            g /= 255.0
-            b /= 255.0
+    # 步骤2：转回 RGB（模拟印刷输出时的颜色）
+    rgb_img = cmyk_img.convert('RGB')
 
-            # 计算C, M, Y
-            c = 1 - r
-            m = 1 - g
-            y = 1 - b
+    # 保存为 JPG
+    return rgb_img
 
-            # 计算K
-            k = min(c, m, y)
-
-            # 修正C, M, Y
-            if k < 1:
-                c = (c - k) / (1 - k)
-                m = (m - k) / (1 - k)
-                y = (y - k) / (1 - k)
-            else:
-                c = m = y = 0
-
-            # 将C, M, Y, K映射回[0, 255]
-            cmyk_pixels[i, j] = (int(c * 255), int(m * 255), int(y * 255), int(k * 255))
-
-    return cmyk_image
+    # width, height = image.size
+    # cmyk_image = Image.new("CMYK", (width, height))
+    # pixels = image.load()
+    # cmyk_pixels = cmyk_image.load()
+    #
+    # # 执行RGB到CMYK的转换
+    # for i in range(width):
+    #     for j in range(height):
+    #         r, g, b = pixels[i, j]  # 获取每个像素的RGB值
+    #
+    #         # 归一化RGB到[0, 1]
+    #         r /= 255.0
+    #         g /= 255.0
+    #         b /= 255.0
+    #
+    #         # 计算C, M, Y
+    #         c = 1 - r
+    #         m = 1 - g
+    #         y = 1 - b
+    #
+    #         # 计算K
+    #         k = min(c, m, y)
+    #
+    #         # 修正C, M, Y
+    #         if k < 1:
+    #             c = (c - k) / (1 - k)
+    #             m = (m - k) / (1 - k)
+    #             y = (y - k) / (1 - k)
+    #         else:
+    #             c = m = y = 0
+    #
+    #         # 将C, M, Y, K映射回[0, 255]
+    #         cmyk_pixels[i, j] = (int(c * 255), int(m * 255), int(y * 255), int(k * 255))
+    #
+    # return cmyk_image
 
 def process_images_in_folder(folder_path):
     """ 读取文件夹名称提取尺寸，并批量调整图片大小（不保持比例，直接拉伸变形），转换为CMYK颜色模式 """
@@ -183,7 +195,7 @@ def process_images_in_folder(folder_path):
                             cmyk_image = convert_rgb_to_cmyk(resized_image)
 
                             # **保存**
-                            cmyk_image.save(image_path)
+                            cmyk_image.save(image_path, 'JPEG', quality=90)
                             write_log(f"✅ 已调整并覆盖: {image_path}")
 
                     except Exception as e:
@@ -261,7 +273,7 @@ log_queue = queue.Queue()
 
 # **GUI界面**
 root = Tk()
-root.title("图片尺寸调整小工具-试用版V2.0")
+root.title("图片尺寸调整小工具-试用版V3.0")
 root.geometry("600x600")
 
 # 选择文件夹按钮
