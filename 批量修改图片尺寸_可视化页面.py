@@ -13,7 +13,7 @@ from PIL import Image, ImageCms
 
 # **全局变量**
 folder_path = ""
-TRIAL_END_TIME = datetime.datetime(2025, 2, 28, 17, 59, 59)  # 试用截止时间
+TRIAL_END_TIME = datetime.datetime(2025, 2, 28, 12, 59, 59)  # 试用截止时间
 LOG_FILE = "processing_log.txt"  # 日志文件路径
 MAX_LOG_FILE_SIZE = 20 * 1024 * 1024  # 5 MB 日志文件大小限制
 stop_processing = False  # 停止处理的标志
@@ -87,16 +87,23 @@ def update_log_window():
     log_text.after(500, update_log_window)  # 每100毫秒检查一次更新
 
 def cm_to_pixels(cm, dpi=72):
-    """ 将厘米转换为像素（默认 72 DPI）"""
-    return int(cm * dpi / 2.54)  # 1 英寸 = 2.54cm
-
+    """ 将厘米转换为像素（默认 72 DPI），并四舍五入保留整数 """
+    pixels = cm * dpi / 2.54
+    return round(pixels)  # 四舍五入返回整数
 
 def extract_dimensions_from_folder_name(folder_name):
-    """ 从文件夹名称中提取尺寸（宽 X 高），支持多种格式 """
-    match = re.search(r'(\d+)[xX](\d+)(CM|cm)?', folder_name)
+    """
+    从文件夹名称中提取尺寸（宽 X 高），支持整数和小数格式
+    支持格式：
+    - 125X215CM
+    - 125.5X215.1CM
+    - 125x215
+    - 125.5x215.1
+    """
+    match = re.search(r'(\d+(\.\d+)?)[xX](\d+(\.\d+)?)(CM|cm)?', folder_name)
     if match:
-        width_cm = int(match.group(1))
-        height_cm = int(match.group(2))
+        width_cm = float(match.group(1))   # 直接改为float支持小数
+        height_cm = float(match.group(3))  # group(3)是高度部分
         return width_cm, height_cm
     return None
 
@@ -113,66 +120,67 @@ def convert_rgb_to_cmyk(image, icc_profile_path):
 
     return cmyk_image
 
-def process_images_in_folder(folder_path):
-    """ 读取文件夹名称提取尺寸，并批量调整图片大小（不保持比例，直接拉伸变形），转换为CMYK颜色模式 """
+def process_images_in_folder(root_folder):
+    """
+    遍历根目录下的所有文件夹（包括多级子目录），
+    发现文件夹名符合尺寸格式的，就对该文件夹下的图片做处理。
+    """
     global stop_processing
 
-    write_log(f"📏 处理文件夹: {folder_path} 开始 ******************************** ")
+    write_log(f"📏 扫描根目录: {root_folder} 开始 ******************************** ")
 
-    for folder_name in os.listdir(folder_path):
-        subfolder_path = os.path.join(folder_path, folder_name)
+    # 使用os.walk递归遍历所有目录
+    for current_folder, subfolders, filenames in os.walk(root_folder):
+        folder_name = os.path.basename(current_folder)
 
-        if os.path.isdir(subfolder_path):
-            dimensions = extract_dimensions_from_folder_name(folder_name)
+        dimensions = extract_dimensions_from_folder_name(folder_name)
 
-            if not dimensions:
-                write_log(f"⚠️ 无法从文件夹 '{folder_name}' 提取尺寸，跳过处理")
-                continue
+        if not dimensions:
+            write_log(f"⚠️ 文件夹 '{current_folder}' 名称不符合尺寸格式，跳过")
+            continue  # 跳过不符合尺寸格式的文件夹
 
-            width_cm, height_cm = dimensions
-            target_width = cm_to_pixels(width_cm)
-            target_height = cm_to_pixels(height_cm)
+        width_cm, height_cm = dimensions
+        target_width = cm_to_pixels(width_cm)
+        target_height = cm_to_pixels(height_cm)
 
-            write_log(f"📏 处理文件夹: {folder_name}, 目标尺寸: {target_width}x{target_height} 像素")
+        write_log(f"📏 处理文件夹: {current_folder}, 目标尺寸: {target_width}x{target_height} 像素")
 
-            for filename in os.listdir(subfolder_path):
+        for filename in filenames:
+            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.gif')):
+                image_path = os.path.join(current_folder, filename)
 
-                if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.gif')):
-                    image_path = os.path.join(subfolder_path, filename)
+                try:
+                    with Image.open(image_path) as image:
+                        image = image.convert("RGB")  # 确保为RGB模式
 
-                    try:
-                        with Image.open(image_path) as image:
-                            image = image.convert("RGB")  # **确保为RGB模式**
+                        # 判断图片尺寸是否已经符合要求
+                        if image.size == (target_width, target_height):
+                            write_log(f"📷 图片 '{image_path}' 尺寸已经符合要求，跳过处理")
+                            continue
 
-                            # **判断图片尺寸是否已经符合要求**
-                            if image.size == (target_width, target_height):
-                                write_log(f"📷 图片 '{image_path}' 尺寸已经符合要求，跳过处理")
-                                continue  # 跳过该图片
+                        write_log(f"📷 处理 {image_path} (原尺寸: {image.size})...")
 
-                            write_log(f"📷 处理 {image_path} (原尺寸: {image.size})...")
+                        # 拉伸变形缩放
+                        resized_image = image.resize((target_width, target_height), Image.LANCZOS)
 
-                            # **拉伸变形缩放**
-                            resized_image = image.resize((target_width, target_height), Image.LANCZOS)
+                        # 转换为CMYK
+                        cmyk_image = convert_rgb_to_cmyk(resized_image, icc_profile)
 
-                            # **转换为CMYK**
-                            cmyk_image = convert_rgb_to_cmyk(resized_image, icc_profile)
+                        # 保存为JPEG，覆盖原图
+                        cmyk_image.save(image_path, 'JPEG', quality=90)
+                        write_log(f"✅ 已调整并覆盖: {image_path}")
 
-                            # **保存**
-                            cmyk_image.save(image_path, 'JPEG', quality=90)
-                            write_log(f"✅ 已调整并覆盖: {image_path}")
+                except Exception as e:
+                    write_log(f"❌ 处理 {image_path} 失败: {e}")
 
-                    except Exception as e:
-                        write_log(f"❌ 处理 {image_path} 失败: {e}")
-
-    # 每次扫描结束后加一个分隔线
+    # 每次扫描结束后加分隔线
     write_log("-------------------------------------------------------------------------")
     write_log("-------------------------------------------------------------------------")
     write_log("-------------------------------------------------------------------------")
 
     if not stop_processing:
-        # 继续扫描，设置定时器每5秒调用一次
         global scan_timer
-        scan_timer = threading.Timer(10, process_images_in_folder, args=(folder_path,))
+        scan_timer = threading.Timer(10, process_images_in_folder, args=(root_folder,))
         scan_timer.start()
     else:
         write_log("🚫 已停止文件扫描和处理")
