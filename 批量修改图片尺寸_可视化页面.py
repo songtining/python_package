@@ -10,6 +10,7 @@ import queue
 from tkinter import *
 from tkinter import filedialog, scrolledtext
 from PIL import Image, ImageCms
+Image.MAX_IMAGE_PIXELS = 1000000000  # 设置为5亿像素，适应你的大图
 
 # 全局变量
 folder_path = ""
@@ -181,7 +182,7 @@ def stop_processing_function():
 
 # GUI界面
 root = Tk()
-root.title("图片尺寸调整小工具-试用版V5.0")
+root.title("图片尺寸调整小工具-试用版V5.1")
 root.geometry("800x600")
 
 folder_button = Button(root, text="选择文件夹", command=browse_folder)
