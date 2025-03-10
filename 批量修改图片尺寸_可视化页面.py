@@ -14,7 +14,7 @@ Image.MAX_IMAGE_PIXELS = 1000000000  # 设置为5亿像素，适应你的大图
 
 # 全局变量
 folder_path = ""
-TRIAL_END_TIME = datetime.datetime(2025, 3, 5, 17, 59, 59)
+TRIAL_END_TIME = datetime.datetime(2025, 3, 10, 17, 59, 59)
 LOG_FILE = "processing_log.txt"
 MAX_LOG_FILE_SIZE = 20 * 1024 * 1024
 stop_processing = False
