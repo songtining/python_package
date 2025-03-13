@@ -9,7 +9,8 @@ import threading
 import queue
 from tkinter import *
 from tkinter import filedialog, scrolledtext
-from PIL import Image, ImageCms
+from PIL import Image, ImageCms, ImageDraw
+import math
 Image.MAX_IMAGE_PIXELS = 1000000000  # 设置为5亿像素，适应你的大图
 
 # 全局变量
@@ -21,8 +22,11 @@ stop_processing = False
 MAX_LOG_LINES = 500
 scan_thread = None  # 后台线程
 CONFIG_FILE = "config.json"
-icc_profile = "USWebCoatedSWOP.icc"
+icc_profile = "CMYK.icc"
 log_queue = queue.Queue()
+line_color = "white"  # 新增全局变量用于存储画线颜色
+line_width = 0.06
+horizontal_offset_options = ["6", "7"]
 
 # 设置日志
 def setup_logging():
@@ -33,17 +37,22 @@ def setup_logging():
     logging.basicConfig(level=logging.INFO, handlers=[handler])
 
 def load_config():
-    """ 读取配置文件，获取默认文件夹路径 """
-    global folder_path
+    """ 读取配置文件，获取默认文件夹路径和画线颜色 """
+    global folder_path, line_color, line_width
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r") as config_file:
             try:
                 config = json.load(config_file)
                 folder_path = config.get("folder_path", "")
+                # 读取画线颜色
+                line_color = config.get("line_color", "white")
+                line_width = config.get("line_width", 0.06)
                 if folder_path == "":
                     write_log("⚠️ 配置文件格式错误，请重新配置或手动选择文件夹")
                 else:
                     write_log(f"🔧 已加载配置文件，默认文件夹路径：{folder_path}")
+                    write_log(f"🔧 已加载配置文件，画线颜色：{line_color}")
+                    write_log(f"🔧 已加载配置文件，画线宽度：{line_width}mm")
                     folder_label.config(text=f"已加载默认配置文件夹: {folder_path}")  # 显示加载后的路径
                     start_button.config(state=NORMAL)  # 启用“开始处理”按钮
             except json.JSONDecodeError:
@@ -119,18 +128,33 @@ def process_images_in_folder(root_folder):
                             write_log(f"✅ 图片 '{image_path}' 尺寸已符合要求，跳过")
                             continue
 
+                        write_log(f"✅ 图片 '{image_path}' 开始处理...")
+                        # 调整尺寸
                         resized_image = image.resize((target_width, target_height), Image.LANCZOS)
+                        write_log(f"✅ 尺寸调整成功...")
+                        if (draw_lines.get() == True):
+                            write_log(f"✅ 画线开始, 线条颜色: {line_color}, 线条宽度: {line_width}, 画线偏移量: {selected_horizontal_offset.get()}CM...")
+                            # 画线
+                            resized_image = draw_lines_on_image(resized_image, horizontal_offset_cm=int(selected_horizontal_offset.get()), dpi=72)
+                            write_log(f"✅ 画线成功...")
+                        else:
+                            write_log(f"✅ 不画线, 跳过...")
+
+                        # 转cmyk模式
                         cmyk_image = convert_rgb_to_cmyk(resized_image, icc_profile)
+                        write_log(f"✅ 转CMYK模式成功...")
 
                         # 强制保存为JPEG格式
                         jpg_image_path = os.path.splitext(image_path)[0] + ".jpg"
                         cmyk_image.save(jpg_image_path, 'JPEG', quality=90)
+                        write_log(f"✅ 保存到本地成功...")
 
                         # 如果原文件不是jpg，则删除原文件
                         if not image_path.lower().endswith('.jpg'):
                             os.remove(image_path)
+                            write_log(f"✅ 删除原图片文件成功...")
 
-                        write_log(f"✅ 已处理并覆盖: {image_path}")
+                        write_log(f"✅ 图片处理完成！！！")
 
                 except Exception as e:
                     write_log(f"❌ 处理失败: {image_path}, 错误: {e}")
@@ -142,6 +166,44 @@ def process_images_in_folder(root_folder):
     write_log("✅✅✅------------ 本次扫描处理图片完成！！！ ------------")
     start_button.config(state="normal")
     stop_button.config(state="disabled")
+
+def draw_lines_on_image(image, horizontal_offset_cm=7, dpi=72):
+    """ 在图片上方指定厘米处绘制水平线，并在中央绘制垂直线 """
+
+    # 打开图片
+    # image = Image.open(image_path)
+    draw = ImageDraw.Draw(image)
+
+    # 获取图片尺寸
+    width, height = image.size
+
+    # 计算水平线位置（7cm 对应的像素）
+    horizontal_offset_px = cm_to_pixels(horizontal_offset_cm, dpi)
+
+    # 确保线条不会超出图片范围
+    y_horizontal = min(horizontal_offset_px, height - 1)
+    x_vertical = width // 2
+
+    # 将0.1毫米转换为像素
+    line_width_px = mm_to_pixels(line_width, dpi)
+    # 四舍五入取整，因为线条宽度一般为整数像素
+    line_width_px = math.ceil(line_width_px) if line_width_px - math.floor(line_width_px) >= 0.5 else math.floor(line_width_px)
+
+    # 画水平线 (从 (0, y) 到 (width, y))
+    draw.line([(0, y_horizontal), (width, y_horizontal)], fill=line_color, width=line_width_px)
+
+    # 画垂直线 (从 (x, 0) 到 (x, height))
+    draw.line([(x_vertical, 0), (x_vertical, height)], fill=line_color, width=line_width_px)
+
+    return image
+
+    # 保存新图片
+    # image.save(output_path)
+    # write_log(f"✅ 图片画线完成'{image_path}'")
+
+def mm_to_pixels(mm_value, dpi):
+    """将毫米转换为像素"""
+    return mm_value * (dpi / 25.4)
 
 def start_threaded_processing():
     global scan_thread, stop_processing
@@ -182,7 +244,7 @@ def stop_processing_function():
 
 # GUI界面
 root = Tk()
-root.title("图片尺寸调整小工具-试用版V5.3")
+root.title("图片尺寸调整小工具-试用版V6.0")
 root.geometry("800x600")
 
 folder_button = Button(root, text="选择文件夹", command=browse_folder)
@@ -191,11 +253,33 @@ folder_button.pack(pady=10)
 folder_label = Label(root, text="请选择文件夹")
 folder_label.pack()
 
-start_button = Button(root, text="开始处理", state=DISABLED, command=start_threaded_processing)
-start_button.pack()
+# 新增：水平偏移量选择项
+selected_horizontal_offset = StringVar()
+selected_horizontal_offset.set(horizontal_offset_options[0])  # 默认选择7CM
 
-stop_button = Button(root, text="停止处理", command=stop_processing_function)
-stop_button.pack()
+# 创建一个 Frame 容器（用于存放同一行的组件）
+frame = Frame(root)
+frame.pack(pady=10)  # 设置一点垂直间距
+
+draw_lines = BooleanVar(root)  # 记录是否绘制线条，默认不绘制
+# 复选框（是否绘制线条）
+# 复选框（是否绘制线条）
+check_button = Checkbutton(frame, text="是否绘制线条", variable=draw_lines)
+check_button.pack(side="left", padx=5)  # `side="left"` 让它放在左侧
+
+# 新增：水平偏移量选择项
+offset_label = Label(frame, text="选择上方水平画线偏移量（CM）:")
+offset_label.pack(side="left", padx=5)
+offset_menu = OptionMenu(frame, selected_horizontal_offset, *horizontal_offset_options)
+offset_menu.pack(side="left", padx=5)
+
+frame2 = Frame(root)
+frame2.pack(pady=10)  # 设置一点垂直间距
+start_button = Button(frame2, text="开始处理", state=DISABLED, command=start_threaded_processing)
+start_button.pack(side="left", padx=5)
+
+stop_button = Button(frame2, text="停止处理", command=stop_processing_function)
+stop_button.pack(side="left", padx=5)
 stop_button.config(state="disabled")
 
 time_label = Label(root, text="", font=("Arial", 14), fg="red")
