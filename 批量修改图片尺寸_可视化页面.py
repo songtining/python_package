@@ -244,7 +244,7 @@ def stop_processing_function():
 
 # GUI界面
 root = Tk()
-root.title("图片尺寸调整小工具-试用版V6.0")
+root.title("图片尺寸调整小工具-试用版V6.1")
 root.geometry("800x600")
 
 folder_button = Button(root, text="选择文件夹", command=browse_folder)
@@ -267,11 +267,11 @@ draw_lines = BooleanVar(root)  # 记录是否绘制线条，默认不绘制
 check_button = Checkbutton(frame, text="是否绘制线条", variable=draw_lines)
 check_button.pack(side="left", padx=5)  # `side="left"` 让它放在左侧
 
-# 新增：水平偏移量选择项
-offset_label = Label(frame, text="选择上方水平画线偏移量（CM）:")
+# 创建输入框代替下拉选择框
+offset_label = Label(frame, text="请输入上方水平画线偏移量（CM）:")
 offset_label.pack(side="left", padx=5)
-offset_menu = OptionMenu(frame, selected_horizontal_offset, *horizontal_offset_options)
-offset_menu.pack(side="left", padx=5)
+offset_entry = Entry(frame, textvariable=selected_horizontal_offset, width=5)
+offset_entry.pack(side="left", padx=5)
 
 frame2 = Frame(root)
 frame2.pack(pady=10)  # 设置一点垂直间距
