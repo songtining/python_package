@@ -143,28 +143,32 @@ def process_images_in_folder(root_folder):
                         else:
                             write_log(f"✅ 第二步：不画线, 跳过...")
 
+                        jpg_image_path = os.path.splitext(image_path)[0] + ".jpg"
+                        resized_image.save(jpg_image_path, 'JPEG', quality=100)
+                        write_log(f"✅ 第三步：保存调整尺寸后的图片成功...")
+
                         # 转cmyk模式
-                        cmyk_image = convert_rgb_to_cmyk(resized_image)
-                        write_log(f"✅ 第三步：转CMYK模式成功...")
+                        # cmyk_image = convert_rgb_to_cmyk(resized_image)
+                        # write_log(f"✅ 第三步：转CMYK模式成功...")
 
                         # 强制保存为JPEG格式
                         # jpg_image_path = os.path.splitext(image_path)[0] + ".jpg"
                         # cmyk_image.save(jpg_image_path, 'JPEG', quality=90)
-                        tif_image_path = os.path.splitext(image_path)[0] + ".tif"
+                        # tif_image_path = os.path.splitext(image_path)[0] + ".tif"
                         # 以无损 LZW 压缩方式保存为 TIF
-                        cmyk_image.save(tif_image_path, "TIFF", compression="tiff_lzw")
-                        write_log(f"✅ 第四步：tif文件保存到本地成功...")
+                        # cmyk_image.save(tif_image_path, "TIFF", compression="tiff_lzw")
+                        # write_log(f"✅ 第四步：tif文件保存到本地成功...")
 
-                        jpg_image_path = os.path.splitext(image_path)[0] + ".jpg"
-                        convert_cmyk_tif_to_cmyk_jpeg(tif_image_path, jpg_image_path)
-                        write_log(f"✅ 第五步：tif to jpg, 文件保存到本地成功...")
+                        # jpg_image_path = os.path.splitext(image_path)[0] + ".jpg"
+                        convert_cmyk_tif_to_cmyk_jpeg(jpg_image_path, jpg_image_path)
+                        write_log(f"✅ 第四步：调用PS -> 图片转CMYK模式成功, 文件保存到本地成功...")
 
                         # 如果原文件不是jpg，则删除原文件
                         if not image_path.lower().endswith('.jpg'):
                             os.remove(image_path)
                             write_log(f"✅ 删除原图片文件成功...")
 
-                        os.remove(tif_image_path)
+                        # os.remove(tif_image_path)
 
                         write_log(f"✅ 图片处理完成！！！")
 
