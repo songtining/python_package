@@ -23,7 +23,6 @@ stop_processing = False
 MAX_LOG_LINES = 500
 scan_thread = None  # 后台线程
 CONFIG_FILE = "config.json"
-icc_profile = "CMYK1.icc"
 log_queue = queue.Queue()
 line_color = "white"  # 新增全局变量用于存储画线颜色
 line_width = 0.06
@@ -83,8 +82,8 @@ def extract_dimensions_from_folder_name(folder_name):
         return float(match.group(1)), float(match.group(3))
     return None
 
-def convert_rgb_to_cmyk(image, icc_profile_path):
-    cmyk_profile = ImageCms.getOpenProfile(icc_profile_path)
+def convert_rgb_to_cmyk(image):
+    cmyk_profile = ImageCms.getOpenProfile("CMYK.icc")
     # srgb_profile = ImageCms.createProfile("sRGB.icc")
     srgb_profile = ImageCms.getOpenProfile("sRGB.icc")
     return ImageCms.profileToProfile(image, srgb_profile, cmyk_profile, outputMode="CMYK")
@@ -131,20 +130,22 @@ def process_images_in_folder(root_folder):
                             continue
 
                         write_log(f"✅ 图片 '{image_path}' 开始处理...")
+
                         # 调整尺寸
                         resized_image = image.resize((target_width, target_height), Image.LANCZOS)
-                        write_log(f"✅ 尺寸调整成功...")
+                        write_log(f"✅ 第一步：尺寸调整成功...")
+
                         if (draw_lines.get() == True):
-                            write_log(f"✅ 画线开始, 线条颜色: {line_color}, 线条宽度: {line_width}, 画线偏移量: {selected_horizontal_offset.get()}CM...")
+                            write_log(f"✅ 第二步：画线开始, 线条颜色: {line_color}, 线条宽度: {line_width}, 画线偏移量: {selected_horizontal_offset.get()}CM...")
                             # 画线
                             resized_image = draw_lines_on_image(resized_image, horizontal_offset_cm=int(selected_horizontal_offset.get()), dpi=72)
-                            write_log(f"✅ 画线成功...")
+                            write_log(f"✅ 第二步：画线成功...")
                         else:
-                            write_log(f"✅ 不画线, 跳过...")
+                            write_log(f"✅ 第二步：不画线, 跳过...")
 
                         # 转cmyk模式
-                        cmyk_image = convert_rgb_to_cmyk(resized_image, icc_profile)
-                        write_log(f"✅ 转CMYK模式成功...")
+                        cmyk_image = convert_rgb_to_cmyk(resized_image)
+                        write_log(f"✅ 第三步：转CMYK模式成功...")
 
                         # 强制保存为JPEG格式
                         # jpg_image_path = os.path.splitext(image_path)[0] + ".jpg"
@@ -152,17 +153,17 @@ def process_images_in_folder(root_folder):
                         tif_image_path = os.path.splitext(image_path)[0] + ".tif"
                         # 以无损 LZW 压缩方式保存为 TIF
                         cmyk_image.save(tif_image_path, "TIFF", compression="tiff_lzw")
-                        write_log(f"✅ tif文件保存到本地成功...")
+                        write_log(f"✅ 第四步：tif文件保存到本地成功...")
 
                         jpg_image_path = os.path.splitext(image_path)[0] + ".jpg"
                         convert_cmyk_tif_to_cmyk_jpeg(tif_image_path, jpg_image_path)
-                        write_log(f"✅ jpg文件保存到本地成功...")
-
+                        write_log(f"✅ 第五步：tif to jpg, 文件保存到本地成功...")
 
                         # 如果原文件不是jpg，则删除原文件
                         if not image_path.lower().endswith('.jpg'):
                             os.remove(image_path)
                             write_log(f"✅ 删除原图片文件成功...")
+
                         os.remove(tif_image_path)
 
                         write_log(f"✅ 图片处理完成！！！")
@@ -244,8 +245,6 @@ def convert_cmyk_tif_to_cmyk_jpeg(input_tif, output_jpg):
 
     # 关闭文档
     doc.Close()
-
-    write_log(f"✅ tif -> jpg 转换完成")
 
 def start_threaded_processing():
     global scan_thread, stop_processing
