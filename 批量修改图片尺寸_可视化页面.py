@@ -227,42 +227,32 @@ def mm_to_pixels(mm_value, dpi):
 
 def convert_rgb_to_cmyk_jpeg(input_tif, output_jpg):
     """
-    使用 Photoshop 将 CMYK TIFF 转换为 RGB JPEG，并保留颜色配置
-    :param input_tif: 输入的 TIFF 文件路径
+    使用 Photoshop 将 CMYK TIF 转换为 CMYK JPEG，并保持 CMYK 颜色空间
+    :param input_tif: 输入的 TIF 文件路径
     :param output_jpg: 输出的 JPEG 文件路径
     """
-    if not os.path.isfile(input_tif):
-        raise FileNotFoundError(f"输入文件不存在: {input_tif}")
-
+    # 启动 Photoshop
     psApp = win32com.client.Dispatch("Photoshop.Application")
-    psApp.DisplayDialogs = 3  # 静默模式
+    psApp.DisplayDialogs = 3  # 设为静默模式，不弹出对话框
 
-    try:
-        # 打开原始文件的副本
-        doc = psApp.Open(input_tif).Duplicate()
+    # 打开 TIF 文件
+    doc = psApp.Open(input_tif)
 
-        # 确保CMYK模式
-        if doc.Mode != 3:  # psCMYKMode
-            doc.ChangeMode(3)
-            doc.Save()
+    # 确保文档颜色模式为 CMYK
+    if doc.Mode != 3:  # 3 = psCMYKMode
+        doc.ChangeMode(3)  # 转为 CMYK
+        doc.Save()
 
-        # 创建JPEG保存选项
-        options = win32com.client.Dispatch("Photoshop.JPEGSaveOptions")
-        options.Quality = 12
-        options.Matte = 1  # psNoMatte
-        options.EmbedColorProfile = True
-        options.UseOptimizedJPEG = True
+    # 设置 JPEG 保存选项
+    options = win32com.client.Dispatch("Photoshop.JPEGSaveOptions")
+    options.Quality = 12  # 最高质量 (1-12)
+    options.Matte = 1  # 1 = psNoMatte，保持透明区域
 
-        # 保存为JPEG（自动转换为RGB）
-        doc.SaveAs(output_jpg, options, True)
+    # 保存为 JPEG
+    doc.SaveAs(output_jpg, options, True)
 
-    except Exception as e:
-        print(f"转换错误: {str(e)}")
-        raise
-    finally:
-        # 清理资源
-        if 'doc' in locals() and doc.IsOpen:
-            doc.Close()
+    # 关闭文档
+    doc.Close()
 
 def start_threaded_processing():
     global scan_thread, stop_processing
@@ -303,7 +293,7 @@ def stop_processing_function():
 
 # GUI界面
 root = Tk()
-root.title("图片尺寸调整小工具-试用版V6.6")
+root.title("图片尺寸调整小工具-试用版V6.7")
 root.geometry("800x600")
 
 folder_button = Button(root, text="选择文件夹", command=browse_folder)
