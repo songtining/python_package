@@ -85,7 +85,8 @@ def extract_dimensions_from_folder_name(folder_name):
 
 def convert_rgb_to_cmyk(image, icc_profile_path):
     cmyk_profile = ImageCms.getOpenProfile(icc_profile_path)
-    srgb_profile = ImageCms.createProfile("sRGB")
+    # srgb_profile = ImageCms.createProfile("sRGB.icc")
+    srgb_profile = ImageCms.getOpenProfile("sRGB.icc")
     return ImageCms.profileToProfile(image, srgb_profile, cmyk_profile, outputMode="CMYK")
 
 def process_images_in_folder(root_folder):
@@ -123,7 +124,7 @@ def process_images_in_folder(root_folder):
 
                 try:
                     with Image.open(image_path) as image:
-                        image = image.convert("RGB")
+                        # image = image.convert("RGB")
 
                         if image.size == (target_width, target_height):
                             write_log(f"✅ 图片 '{image_path}' 尺寸已符合要求，跳过")
