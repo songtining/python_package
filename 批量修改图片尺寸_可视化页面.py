@@ -143,7 +143,7 @@ def process_images_in_folder(root_folder):
                         else:
                             write_log(f"✅ 第二步：不画线, 跳过...")
 
-                        jpg_image_path = os.path.splitext(image_path)[0] + ".jpg"
+                        jpg_image_path = os.path.splitext(image_path)[0] + "_tmp.jpg"
                         resized_image.save(jpg_image_path, 'JPEG', quality=100)
                         write_log(f"✅ 第三步：保存调整尺寸后的图片成功...")
 
@@ -160,7 +160,7 @@ def process_images_in_folder(root_folder):
                         # write_log(f"✅ 第四步：tif文件保存到本地成功...")
 
                         # jpg_image_path = os.path.splitext(image_path)[0] + ".jpg"
-                        convert_cmyk_tif_to_cmyk_jpeg(jpg_image_path, jpg_image_path)
+                        convert_rgb_to_cmyk_jpeg(jpg_image_path, os.path.splitext(image_path)[0] + ".jpg")
                         write_log(f"✅ 第四步：调用PS -> 图片转CMYK模式成功, 文件保存到本地成功...")
 
                         # 如果原文件不是jpg，则删除原文件
@@ -168,7 +168,7 @@ def process_images_in_folder(root_folder):
                             os.remove(image_path)
                             write_log(f"✅ 删除原图片文件成功...")
 
-                        # os.remove(tif_image_path)
+                        os.remove(jpg_image_path)
 
                         write_log(f"✅ 图片处理完成！！！")
 
@@ -222,7 +222,7 @@ def mm_to_pixels(mm_value, dpi):
     return mm_value * (dpi / 25.4)
 
 
-def convert_cmyk_tif_to_cmyk_jpeg(input_tif, output_jpg):
+def convert_rgb_to_cmyk_jpeg(input_tif, output_jpg):
     """
     使用 Photoshop 将 CMYK TIF 转换为 CMYK JPEG，并保持 CMYK 颜色空间
     :param input_tif: 输入的 TIF 文件路径
