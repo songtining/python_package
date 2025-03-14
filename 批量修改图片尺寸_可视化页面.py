@@ -11,18 +11,19 @@ from tkinter import *
 from tkinter import filedialog, scrolledtext
 from PIL import Image, ImageCms, ImageDraw
 import math
+import win32com.client
 Image.MAX_IMAGE_PIXELS = 1000000000  # 设置为5亿像素，适应你的大图
 
 # 全局变量
 folder_path = ""
-TRIAL_END_TIME = datetime.datetime(2025, 3, 14, 17, 59, 59)
+TRIAL_END_TIME = datetime.datetime(2025, 3, 16, 17, 59, 59)
 LOG_FILE = "processing_log.txt"
 MAX_LOG_FILE_SIZE = 20 * 1024 * 1024
 stop_processing = False
 MAX_LOG_LINES = 500
 scan_thread = None  # 后台线程
 CONFIG_FILE = "config.json"
-icc_profile = "CMYK.icc"
+icc_profile = "CMYK1.icc"
 log_queue = queue.Queue()
 line_color = "white"  # 新增全局变量用于存储画线颜色
 line_width = 0.06
@@ -145,14 +146,23 @@ def process_images_in_folder(root_folder):
                         write_log(f"✅ 转CMYK模式成功...")
 
                         # 强制保存为JPEG格式
+                        # jpg_image_path = os.path.splitext(image_path)[0] + ".jpg"
+                        # cmyk_image.save(jpg_image_path, 'JPEG', quality=90)
+                        tif_image_path = os.path.splitext(image_path)[0] + ".tif"
+                        # 以无损 LZW 压缩方式保存为 TIF
+                        cmyk_image.save(tif_image_path, "TIFF", compression="tiff_lzw")
+                        write_log(f"✅ tif文件保存到本地成功...")
+
                         jpg_image_path = os.path.splitext(image_path)[0] + ".jpg"
-                        cmyk_image.save(jpg_image_path, 'JPEG', quality=90)
-                        write_log(f"✅ 保存到本地成功...")
+                        convert_cmyk_tif_to_cmyk_jpeg(tif_image_path, jpg_image_path)
+                        write_log(f"✅ jpg文件保存到本地成功...")
+
 
                         # 如果原文件不是jpg，则删除原文件
                         if not image_path.lower().endswith('.jpg'):
                             os.remove(image_path)
                             write_log(f"✅ 删除原图片文件成功...")
+                        os.remove(tif_image_path)
 
                         write_log(f"✅ 图片处理完成！！！")
 
@@ -205,6 +215,37 @@ def mm_to_pixels(mm_value, dpi):
     """将毫米转换为像素"""
     return mm_value * (dpi / 25.4)
 
+
+def convert_cmyk_tif_to_cmyk_jpeg(input_tif, output_jpg):
+    """
+    使用 Photoshop 将 CMYK TIF 转换为 CMYK JPEG，并保持 CMYK 颜色空间
+    :param input_tif: 输入的 TIF 文件路径
+    :param output_jpg: 输出的 JPEG 文件路径
+    """
+    # 启动 Photoshop
+    psApp = win32com.client.Dispatch("Photoshop.Application")
+    psApp.DisplayDialogs = 3  # 设为静默模式，不弹出对话框
+
+    # 打开 TIF 文件
+    doc = psApp.Open(input_tif)
+
+    # 确保文档颜色模式为 CMYK
+    if doc.Mode != 3:  # 3 = psCMYKMode
+        doc.ChangeMode(3)  # 转为 CMYK
+
+    # 设置 JPEG 保存选项
+    options = win32com.client.Dispatch("Photoshop.JPEGSaveOptions")
+    options.Quality = 12  # 最高质量 (1-12)
+    options.Matte = 1  # 1 = psNoMatte，保持透明区域
+
+    # 保存为 JPEG
+    doc.SaveAs(output_jpg, options, True)
+
+    # 关闭文档
+    doc.Close()
+
+    write_log(f"✅ tif -> jpg 转换完成")
+
 def start_threaded_processing():
     global scan_thread, stop_processing
     stop_processing = False
@@ -244,7 +285,7 @@ def stop_processing_function():
 
 # GUI界面
 root = Tk()
-root.title("图片尺寸调整小工具-试用版V6.2")
+root.title("图片尺寸调整小工具-试用版V6.3")
 root.geometry("800x600")
 
 folder_button = Button(root, text="选择文件夹", command=browse_folder)
