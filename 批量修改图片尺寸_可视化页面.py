@@ -303,7 +303,7 @@ def stop_processing_function():
 
 # GUI界面
 root = Tk()
-root.title("图片尺寸调整小工具-试用版V6.4")
+root.title("图片尺寸调整小工具-试用版V6.6")
 root.geometry("800x600")
 
 folder_button = Button(root, text="选择文件夹", command=browse_folder)
