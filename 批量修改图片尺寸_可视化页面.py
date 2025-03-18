@@ -112,6 +112,7 @@ def process_images_in_folder(root_folder):
 
         write_log(f"📏 处理文件夹: {current_folder}, 目标尺寸: {target_width}x{target_height} 像素")
 
+        jpg_seq = 1
         for filename in filenames:
             if stop_processing:
                 write_log("🚫 停止信号收到，提前终止图片处理")
@@ -163,7 +164,9 @@ def process_images_in_folder(root_folder):
                         # write_log(f"✅ 第四步：tif文件保存到本地成功...")
 
                         # jpg_image_path = os.path.splitext(image_path)[0] + ".jpg"
-                        convert_rgb_to_cmyk_jpeg(tif_image_path, os.path.splitext(image_path)[0] + ".jpg")
+                        # convert_rgb_to_cmyk_jpeg(tif_image_path, os.path.splitext(image_path)[0] + ".jpg")
+                        jpg_file_name = "已处理_" + jpg_seq + "(" + folder_name + ")"
+                        convert_rgb_to_cmyk_jpeg(tif_image_path, jpg_file_name)
                         write_log(f"✅ 第四步：调用PS -> 图片转CMYK模式成功, 文件保存到本地成功...")
 
                         # 如果原文件不是jpg，则删除原文件
@@ -293,7 +296,7 @@ def stop_processing_function():
 
 # GUI界面
 root = Tk()
-root.title("图片尺寸调整小工具-试用版V7.0")
+root.title("图片尺寸调整小工具-试用版V7.5")
 root.geometry("800x600")
 
 folder_button = Button(root, text="选择文件夹", command=browse_folder)
