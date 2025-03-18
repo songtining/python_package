@@ -137,9 +137,16 @@ def process_images_in_folder(root_folder):
                         write_log(f"✅ 第一步：尺寸调整成功...")
 
                         if (draw_lines.get() == True):
-                            write_log(f"✅ 第二步：画线开始, 线条颜色: {line_color}, 线条宽度: {line_width}, 画线偏移量: {selected_horizontal_offset.get()}CM...")
+                            draw_line_color = ""
+                            if draw_lines_color_1.get() == True:
+                                draw_line_color = "white"
+                            if draw_lines_color_2.get() == True:
+                                draw_line_color = "gray"
+                            if draw_lines_color_3.get() == True:
+                                draw_line_color = "black"
+                            write_log(f"✅ 第二步：画线开始, 线条颜色: {draw_line_color}, 线条宽度: {line_width}, 画线偏移量: {selected_horizontal_offset.get()}CM...")
                             # 画线
-                            resized_image = draw_lines_on_image(resized_image, horizontal_offset_cm=int(selected_horizontal_offset.get()), dpi=72)
+                            resized_image = draw_lines_on_image(resized_image, draw_line_color, horizontal_offset_cm=int(selected_horizontal_offset.get()), dpi=72)
                             write_log(f"✅ 第二步：画线成功...")
                         else:
                             write_log(f"✅ 第二步：不画线, 跳过...")
@@ -191,7 +198,7 @@ def process_images_in_folder(root_folder):
     start_button.config(state="normal")
     stop_button.config(state="disabled")
 
-def draw_lines_on_image(image, horizontal_offset_cm=7, dpi=72):
+def draw_lines_on_image(image, draw_line_color, horizontal_offset_cm=7, dpi=72):
     """ 在图片上方指定厘米处绘制水平线，并在中央绘制垂直线 """
 
     # 打开图片
@@ -214,10 +221,10 @@ def draw_lines_on_image(image, horizontal_offset_cm=7, dpi=72):
     line_width_px = math.ceil(line_width_px) if line_width_px - math.floor(line_width_px) >= 0.5 else math.floor(line_width_px)
 
     # 画水平线 (从 (0, y) 到 (width, y))
-    draw.line([(0, y_horizontal), (width, y_horizontal)], fill=line_color, width=line_width_px)
+    draw.line([(0, y_horizontal), (width, y_horizontal)], fill=draw_line_color, width=line_width_px)
 
     # 画垂直线 (从 (x, 0) 到 (x, height))
-    draw.line([(x_vertical, 0), (x_vertical, height)], fill=line_color, width=line_width_px)
+    draw.line([(x_vertical, 0), (x_vertical, height)], fill=draw_line_color, width=line_width_px)
 
     return image
 
@@ -317,7 +324,6 @@ frame.pack(pady=10)  # 设置一点垂直间距
 
 draw_lines = BooleanVar(root)  # 记录是否绘制线条，默认不绘制
 # 复选框（是否绘制线条）
-# 复选框（是否绘制线条）
 check_button = Checkbutton(frame, text="是否绘制线条", variable=draw_lines)
 check_button.pack(side="left", padx=5)  # `side="left"` 让它放在左侧
 
@@ -326,6 +332,21 @@ offset_label = Label(frame, text="请输入上方水平画线偏移量（CM）:"
 offset_label.pack(side="left", padx=5)
 offset_entry = Entry(frame, textvariable=selected_horizontal_offset, width=5)
 offset_entry.pack(side="left", padx=5)
+
+# 创建一个 Frame 容器（用于存放同一行的组件）
+frame3 = Frame(root)
+frame3.pack(pady=10)  # 设置一点垂直间距
+draw_lines_color_1 = BooleanVar(root)
+check_button1 = Checkbutton(frame, text="线条颜色-白色", variable=draw_lines_color_1)
+check_button1.pack(side="left", padx=5)  # `side="left"` 让它放在左侧
+
+draw_lines_color_2 = BooleanVar(root)
+check_button2 = Checkbutton(frame, text="线条颜色-灰色", variable=draw_lines_color_2)
+check_button2.pack(side="left", padx=5)  # `side="left"` 让它放在左侧
+
+draw_lines_color_3 = BooleanVar(root)
+check_button3 = Checkbutton(frame, text="线条颜色-黑色", variable=draw_lines_color_3)
+check_button3.pack(side="left", padx=5)  # `side="left"` 让它放在左侧
 
 frame2 = Frame(root)
 frame2.pack(pady=10)  # 设置一点垂直间距
