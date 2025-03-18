@@ -165,9 +165,12 @@ def process_images_in_folder(root_folder):
 
                         # jpg_image_path = os.path.splitext(image_path)[0] + ".jpg"
                         # convert_rgb_to_cmyk_jpeg(tif_image_path, os.path.splitext(image_path)[0] + ".jpg")
-                        jpg_file_name = "已处理_" + jpg_seq + "(" + folder_name + ")"
+
+                        jpg_seq_str = str(jpg_seq) if jpg_seq > 10 else "0" + str(jpg_seq)
+                        jpg_file_name = "已修改" + jpg_seq_str + "(" + folder_name + ")" + ".jpg"
                         convert_rgb_to_cmyk_jpeg(tif_image_path, jpg_file_name)
                         write_log(f"✅ 第四步：调用PS -> 图片转CMYK模式成功, 文件保存到本地成功...")
+                        jpg_seq += 1
 
                         # 如果原文件不是jpg，则删除原文件
                         if not image_path.lower().endswith('.jpg'):
