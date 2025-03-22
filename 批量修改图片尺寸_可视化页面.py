@@ -92,6 +92,11 @@ def process_images_in_folder(root_folder):
 
     write_log(f"📏 扫描根目录: {root_folder} 开始 ")
 
+    # 初始化 Photoshop 实例（仅一次）
+    ps_app = win32com.client.Dispatch("Photoshop.Application")
+    ps_app.DisplayDialogs = 2  # 全局静默模式
+    success_count = 0
+
     for current_folder, subfolders, filenames in os.walk(root_folder):
         if stop_processing:
             write_log("🚫 停止信号收到，提前终止扫描")
@@ -156,7 +161,7 @@ def process_images_in_folder(root_folder):
                         write_log(f"✅ 第三步：保存调整尺寸后的图片成功...")
 
                         jpg_image_path = os.path.splitext(image_path)[0] + "(" + folder_name + ")" + ".jpg"
-                        convert_rgb_to_cmyk_jpeg(tif_image_path, jpg_image_path)
+                        convert_rgb_to_cmyk_jpeg(tif_image_path, jpg_image_path, ps_app)
                         write_log(f"✅ 第四步：调用PS -> 图片转CMYK模式成功, 文件保存到本地成功...")
                         jpg_seq += 1
 
@@ -216,34 +221,60 @@ def mm_to_pixels(mm_value, dpi):
     return mm_value * (dpi / 25.4)
 
 
-def convert_rgb_to_cmyk_jpeg(input_tif, output_jpg):
+def convert_rgb_to_cmyk_jpeg(input_tif, output_jpg, ps_app=None):
     """
-    使用 Photoshop 将 CMYK TIF 转换为 CMYK JPEG，并保持 CMYK 颜色空间
-    :param input_tif: 输入的 TIF 文件路径
-    :param output_jpg: 输出的 JPEG 文件路径
+    使用已初始化的 Photoshop 实例处理单张图片
+    :param input_tif: 输入 TIF 文件路径
+    :param output_jpg: 输出 JPEG 文件路径
+    :param ps_app: 预初始化的 Photoshop 实例（可选）
+    :return: 是否处理成功
     """
-    # 启动 Photoshop
-    psApp = win32com.client.Dispatch("Photoshop.Application")
-    psApp.DisplayDialogs = 3  # 设为静默模式，不弹出对话框
+    # 初始化 Photoshop（仅当未传入实例时）
+    if ps_app is None:
+        ps_app = win32com.client.Dispatch("Photoshop.Application")
+        ps_app.DisplayDialogs = 2  # 静默模式（关键！原代码是3）
+        ps_app.UserPreferences = {
+            "rasterizationColorSpace": 3,  # 确保栅格化颜色空间为CMYK
+            "jpgQuality": 12               # 默认JPEG质量
+        }
 
-    # 打开 TIF 文件
-    doc = psApp.Open(input_tif)
+    try:
+        # 打开文档并强制关闭旧文档（防残留）
+        if ps_app.Documents.Count > 0:
+            ps_app.Documents.Close(SaveChanges=False)
+        doc = ps_app.Open(input_tif)
+        if not doc:
+            print(f"无法打开文件: {input_tif}")
+            return False
 
-    # 确保文档颜色模式为 CMYK
-    if doc.Mode != 3:  # 3 = psCMYKMode
-        doc.ChangeMode(3)  # 转为 CMYK
-        doc.Save()
+        # 强制转换为CMYK模式（如果输入非CMYK）
+        if doc.Mode != 3:  # 3 = psCMYKMode
+            doc.ChangeMode(3)
+            doc.Save()  # 保存模式变更
 
-    # 设置 JPEG 保存选项
-    options = win32com.client.Dispatch("Photoshop.JPEGSaveOptions")
-    options.Quality = 12  # 最高质量 (1-12)
-    options.Matte = 1  # 1 = psNoMatte，保持透明区域
+        # JPEG保存配置（复用对象提升性能）
+        options = win32com.client.Dispatch("Photoshop.JPEGSaveOptions")
+        options.Quality = ps_app.UserPreferences.get("jpgQuality", 12)
+        options.Matte = 1  # 无蒙版（透明区域填充白色）
 
-    # 保存为 JPEG
-    doc.SaveAs(output_jpg, options, True)
+        # 处理输出路径（避免文件占用）
+        output_dir = os.path.dirname(output_jpg)
+        os.makedirs(output_dir, exist_ok=True)
+        if os.path.exists(output_jpg):
+            os.remove(output_jpg)
 
-    # 关闭文档
-    doc.Close()
+        # 保存并关闭文档（不退出PS）
+        doc.SaveAs(output_jpg, options, overwrite=True)
+        doc.Close(SaveChanges=False)
+        return True
+
+    except Exception as e:
+        print(f"处理 {input_tif} 失败: {str(e)}")
+        return False
+    finally:
+        # 防御性关闭文档（确保资源释放）
+        if 'doc' in locals() and doc.IsOpen:
+            doc.Close(SaveChanges=False)
 
 def start_threaded_processing():
     global scan_thread, stop_processing
@@ -268,7 +299,7 @@ def stop_processing_function():
 
 # GUI界面
 root = Tk()
-root.title("自动调图软件V1.0")
+root.title("自动调图软件V1.1")
 root.geometry("800x600")
 
 folder_button = Button(root, text="选择文件夹", command=browse_folder)
