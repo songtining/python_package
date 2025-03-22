@@ -16,7 +16,7 @@ Image.MAX_IMAGE_PIXELS = 1000000000  # 设置为5亿像素，适应你的大图
 
 # 全局变量
 folder_path = ""
-TRIAL_END_TIME = datetime.datetime(2025, 3, 22, 17, 59, 59)
+# TRIAL_END_TIME = datetime.datetime(2025, 3, 20, 17, 59, 59)
 LOG_FILE = "processing_log.txt"
 MAX_LOG_FILE_SIZE = 20 * 1024 * 1024
 stop_processing = False
@@ -276,21 +276,21 @@ def start_threaded_processing():
     start_button.config(state="disabled")
     stop_button.config(state="normal")
 
-def countdown_timer(label):
-    while True:
-        remaining = TRIAL_END_TIME - datetime.datetime.now()
-        if remaining.total_seconds() <= 0:
-            label.config(text="试用时间已结束!", fg="red")
-            folder_button.config(state="disabled")
-            start_button.config(state="disabled")
-            stop_button.config(state="disabled")
-            break
-
-        days, rem = divmod(remaining.total_seconds(), 86400)
-        hours, rem = divmod(rem, 3600)
-        mins, secs = divmod(rem, 60)
-        label.config(text=f"试用剩余时间: {int(days)}天 {int(hours):02d}:{int(mins):02d}:{int(secs):02d}", fg="red")
-        time.sleep(1)
+# def countdown_timer(label):
+#     while True:
+#         remaining = TRIAL_END_TIME - datetime.datetime.now()
+#         if remaining.total_seconds() <= 0:
+#             label.config(text="试用时间已结束!", fg="red")
+#             folder_button.config(state="disabled")
+#             start_button.config(state="disabled")
+#             stop_button.config(state="disabled")
+#             break
+#
+#         days, rem = divmod(remaining.total_seconds(), 86400)
+#         hours, rem = divmod(rem, 3600)
+#         mins, secs = divmod(rem, 60)
+#         label.config(text=f"试用剩余时间: {int(days)}天 {int(hours):02d}:{int(mins):02d}:{int(secs):02d}", fg="red")
+#         time.sleep(1)
 
 def browse_folder():
     global folder_path
@@ -306,7 +306,7 @@ def stop_processing_function():
 
 # GUI界面
 root = Tk()
-root.title("图片尺寸调整小工具-试用版V7.6")
+root.title("图片尺寸调整小工具-试用版V7.5")
 root.geometry("800x600")
 
 folder_button = Button(root, text="选择文件夹", command=browse_folder)
@@ -358,17 +358,17 @@ stop_button = Button(frame2, text="停止处理", command=stop_processing_functi
 stop_button.pack(side="left", padx=5)
 stop_button.config(state="disabled")
 
-time_label = Label(root, text="", font=("Arial", 14), fg="red")
-time_label.pack()
+# time_label = Label(root, text="", font=("Arial", 14), fg="red")
+# time_label.pack()
 
-end_time_label = Label(root, text=f"试用截止时间: {TRIAL_END_TIME.strftime('%Y-%m-%d %H:%M:%S')}", fg="red")
-end_time_label.pack()
+# end_time_label = Label(root, text=f"试用截止时间: {TRIAL_END_TIME.strftime('%Y-%m-%d %H:%M:%S')}", fg="red")
+# end_time_label.pack()
 
 log_text = scrolledtext.ScrolledText(root, width=90, height=30, wrap=WORD)
 log_text.pack()
 
 update_log_window()
-threading.Thread(target=countdown_timer, args=(time_label,), daemon=True).start()
+# threading.Thread(target=countdown_timer, args=(time_label,), daemon=True).start()
 
 setup_logging()
 load_config()
