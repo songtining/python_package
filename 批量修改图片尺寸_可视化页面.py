@@ -16,7 +16,6 @@ Image.MAX_IMAGE_PIXELS = 1000000000  # 设置为5亿像素，适应你的大图
 
 # 全局变量
 folder_path = ""
-# TRIAL_END_TIME = datetime.datetime(2025, 3, 20, 17, 59, 59)
 LOG_FILE = "processing_log.txt"
 MAX_LOG_FILE_SIZE = 20 * 1024 * 1024
 stop_processing = False
@@ -151,38 +150,17 @@ def process_images_in_folder(root_folder):
                         else:
                             write_log(f"✅ 第二步：不画线, 跳过...")
 
-                        # jpg_image_path = os.path.splitext(image_path)[0] + "_tmp.jpg"
-                        # resized_image.save(jpg_image_path, 'JPEG', quality=100)
                         tif_image_path = os.path.splitext(image_path)[0] + ".tif"
                         # 以无损 LZW 压缩方式保存为 TIF
                         resized_image.save(tif_image_path, "TIFF", compression="tiff_lzw")
                         write_log(f"✅ 第三步：保存调整尺寸后的图片成功...")
 
-                        # 转cmyk模式
-                        # cmyk_image = convert_rgb_to_cmyk(resized_image)
-                        # write_log(f"✅ 第三步：转CMYK模式成功...")
-
-                        # 强制保存为JPEG格式
-                        # jpg_image_path = os.path.splitext(image_path)[0] + ".jpg"
-                        # cmyk_image.save(jpg_image_path, 'JPEG', quality=90)
-                        # tif_image_path = os.path.splitext(image_path)[0] + ".tif"
-                        # 以无损 LZW 压缩方式保存为 TIF
-                        # cmyk_image.save(tif_image_path, "TIFF", compression="tiff_lzw")
-                        # write_log(f"✅ 第四步：tif文件保存到本地成功...")
-
-                        # jpg_image_path = os.path.splitext(image_path)[0] + ".jpg"
-                        # convert_rgb_to_cmyk_jpeg(tif_image_path, os.path.splitext(image_path)[0] + ".jpg")
-
-                        # jpg_seq_str = str(jpg_seq) if jpg_seq > 10 else "0" + str(jpg_seq)
-                        # jpg_file_name = os.path.join(current_folder, extract_prefix(os.path.splitext(image_path)[0]) + "已修改" + jpg_seq_str + "(" + folder_name + ")" + ".jpg")
                         jpg_image_path = os.path.splitext(image_path)[0] + "(" + folder_name + ")" + ".jpg"
                         convert_rgb_to_cmyk_jpeg(tif_image_path, jpg_image_path)
                         write_log(f"✅ 第四步：调用PS -> 图片转CMYK模式成功, 文件保存到本地成功...")
                         jpg_seq += 1
 
                         # 如果原文件不是jpg，则删除原文件
-                        # if not image_path.lower().endswith('.jpg'):
-                        #     os.remove(image_path)
                         os.remove(tif_image_path)
                         os.remove(image_path)
                         write_log(f"✅ 第五步：删除原图片文件成功...")
@@ -276,22 +254,6 @@ def start_threaded_processing():
     start_button.config(state="disabled")
     stop_button.config(state="normal")
 
-# def countdown_timer(label):
-#     while True:
-#         remaining = TRIAL_END_TIME - datetime.datetime.now()
-#         if remaining.total_seconds() <= 0:
-#             label.config(text="试用时间已结束!", fg="red")
-#             folder_button.config(state="disabled")
-#             start_button.config(state="disabled")
-#             stop_button.config(state="disabled")
-#             break
-#
-#         days, rem = divmod(remaining.total_seconds(), 86400)
-#         hours, rem = divmod(rem, 3600)
-#         mins, secs = divmod(rem, 60)
-#         label.config(text=f"试用剩余时间: {int(days)}天 {int(hours):02d}:{int(mins):02d}:{int(secs):02d}", fg="red")
-#         time.sleep(1)
-
 def browse_folder():
     global folder_path
     folder_path = filedialog.askdirectory()
@@ -306,7 +268,7 @@ def stop_processing_function():
 
 # GUI界面
 root = Tk()
-root.title("图片尺寸调整小工具-试用版V7.5")
+root.title("自动调图软件V1.0")
 root.geometry("800x600")
 
 folder_button = Button(root, text="选择文件夹", command=browse_folder)
@@ -358,17 +320,10 @@ stop_button = Button(frame2, text="停止处理", command=stop_processing_functi
 stop_button.pack(side="left", padx=5)
 stop_button.config(state="disabled")
 
-# time_label = Label(root, text="", font=("Arial", 14), fg="red")
-# time_label.pack()
-
-# end_time_label = Label(root, text=f"试用截止时间: {TRIAL_END_TIME.strftime('%Y-%m-%d %H:%M:%S')}", fg="red")
-# end_time_label.pack()
-
 log_text = scrolledtext.ScrolledText(root, width=90, height=30, wrap=WORD)
 log_text.pack()
 
 update_log_window()
-# threading.Thread(target=countdown_timer, args=(time_label,), daemon=True).start()
 
 setup_logging()
 load_config()
