@@ -258,10 +258,10 @@ def convert_rgb_to_cmyk_jpeg(input_tif, output_jpg, ps_app=None):
         options.Matte = 1  # 无蒙版（透明区域填充白色）
 
         # 处理输出路径（避免文件占用）
-        output_dir = os.path.dirname(output_jpg)
-        os.makedirs(output_dir, exist_ok=True)
-        if os.path.exists(output_jpg):
-            os.remove(output_jpg)
+        # output_dir = os.path.dirname(output_jpg)
+        # os.makedirs(output_dir, exist_ok=True)
+        # if os.path.exists(output_jpg):
+        #     os.remove(output_jpg)
 
         # 保存并关闭文档（不退出PS）
         doc.SaveAs(output_jpg, options, overwrite=True)
@@ -299,7 +299,7 @@ def stop_processing_function():
 
 # GUI界面
 root = Tk()
-root.title("自动调图软件V1.1")
+root.title("自动调图软件V1.0")
 root.geometry("800x600")
 
 folder_button = Button(root, text="选择文件夹", command=browse_folder)
