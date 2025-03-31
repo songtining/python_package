@@ -6,7 +6,7 @@ from openpyxl import load_workbook
 from datetime import datetime, timedelta
 
 # 设置试用期结束日期（精确到时分秒）
-trial_end_datetime = datetime(2025, 2, 6, 20, 00, 00)  # 试用期结束时间
+trial_end_datetime = datetime(2025, 3, 31, 20, 00, 00)  # 试用期结束时间
 
 # 计算剩余试用时间（精确到时分秒）
 def get_remaining_trial_time():
@@ -58,8 +58,11 @@ def process_excel(source_file, target_file, months, progress_var, progress_label
         progress_label.config(text=f"正在处理: {index + 1}/{total_rows}")
         root.update_idletasks()
 
+        # match_condition = (
+        #         (target_data.iloc[:, 9] == row['终端资产']) |  # 匹配终端编号
+        #         (target_data.iloc[:, 10] == row['表资产号'])  # 匹配电能表编号
+        # )
         match_condition = (
-                (target_data.iloc[:, 9] == row['终端资产']) |  # 匹配终端编号
                 (target_data.iloc[:, 10] == row['表资产号'])  # 匹配电能表编号
         )
         target_row_index = target_data.loc[match_condition].index
