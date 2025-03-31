@@ -137,7 +137,7 @@ def start_processing():
 
 # 创建 GUI 界面
 root = tk.Tk()
-root.title("油田电子表数据-Excel文件处理工具")
+root.title("油田电子表数据-Excel文件处理工具V1.0")
 root.geometry("600x450")
 
 # 文件选择部分
