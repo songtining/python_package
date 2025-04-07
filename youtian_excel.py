@@ -6,18 +6,18 @@ from openpyxl import load_workbook
 from datetime import datetime, timedelta
 
 # 设置试用期结束日期（精确到时分秒）
-trial_end_datetime = datetime(2025, 3, 31, 20, 00, 00)  # 试用期结束时间
+# trial_end_datetime = datetime(2025, 3, 31, 20, 00, 00)  # 试用期结束时间
 
 # 计算剩余试用时间（精确到时分秒）
-def get_remaining_trial_time():
-    now = datetime.now()
-    if now > trial_end_datetime:
-        return "试用期已过"  # 如果试用期已过
-    else:
-        remaining_time = trial_end_datetime - now
-        hours, remainder = divmod(remaining_time.seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        return f"{remaining_time.days}天 {hours}小时 {minutes}分钟 {seconds}秒"
+# def get_remaining_trial_time():
+#     now = datetime.now()
+#     if now > trial_end_datetime:
+#         return "试用期已过"  # 如果试用期已过
+#     else:
+#         remaining_time = trial_end_datetime - now
+#         hours, remainder = divmod(remaining_time.seconds, 3600)
+#         minutes, seconds = divmod(remainder, 60)
+#         return f"{remaining_time.days}天 {hours}小时 {minutes}分钟 {seconds}秒"
 
 # 处理Excel数据的逻辑
 def process_excel(source_file, target_file, months, progress_var, progress_label):
@@ -137,7 +137,7 @@ def start_processing():
 
 # 创建 GUI 界面
 root = tk.Tk()
-root.title("油田电子表数据-Excel文件处理工具V1.0")
+root.title("油田电子表数据-Excel文件处理工具")
 root.geometry("600x450")
 
 # 文件选择部分
@@ -177,17 +177,17 @@ progress_label = tk.Label(root, text="", font=("Arial", 10), fg="green")
 progress_label.pack(pady=5)
 
 # 显示剩余试用时间
-remaining_trial_time = get_remaining_trial_time()
-trial_label = tk.Label(root, text=f"剩余试用时间: {remaining_trial_time}", font=("Arial", 12), fg="red")
-trial_label.pack(pady=10)
+# remaining_trial_time = get_remaining_trial_time()
+# trial_label = tk.Label(root, text=f"剩余试用时间: {remaining_trial_time}", font=("Arial", 12), fg="red")
+# trial_label.pack(pady=10)
 
 # 更新剩余时间，每秒刷新
-def update_remaining_time():
-    remaining_time = get_remaining_trial_time()
-    trial_label.config(text=f"剩余试用时间: {remaining_time}")
-    root.after(1000, update_remaining_time)  # 每秒更新一次
+# def update_remaining_time():
+#     remaining_time = get_remaining_trial_time()
+#     trial_label.config(text=f"剩余试用时间: {remaining_time}")
+#     root.after(1000, update_remaining_time)  # 每秒更新一次
 
-update_remaining_time()
+# update_remaining_time()
 
 # 处理按钮
 process_button = tk.Button(root, text="开始处理", command=start_processing)
