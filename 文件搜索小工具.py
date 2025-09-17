@@ -78,8 +78,19 @@ class FileSearchTool:
         self.stop_flag = True
         self.log("停止任务...")
 
+
     def start_search(self):
-        filenames = self.filename_text.get("1.0", tk.END).strip().splitlines()
+        # 解析输入，每行格式：文件名 数量
+        raw_lines = self.filename_text.get("1.0", tk.END).strip().splitlines()
+        filenames = []
+        for line in raw_lines:
+            parts = line.strip().split()
+            if not parts:
+                continue
+            fname = parts[0]
+            count = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 1
+            filenames.append((fname, count))
+
         search_dir = self.search_entry.get().strip()
         save_dir = self.save_entry.get().strip()
 
@@ -94,24 +105,32 @@ class FileSearchTool:
         t = threading.Thread(target=self.search_files, args=(filenames, search_dir, save_dir))
         t.start()
 
+
     def search_files(self, filenames, search_dir, save_dir):
-        for i, fname in enumerate(filenames, start=1):
+        global_index = 1  # 全局序号前缀
+
+        for i, (fname, count) in enumerate(filenames, start=1):
             if self.stop_flag:
                 self.log("搜索已中断！")
                 break
 
-            self.log(f"[{i}/{len(filenames)}] 正在搜索: {fname}")
+            self.log(f"[{i}/{len(filenames)}] 正在搜索: {fname} (需要 {count} 份)")
             found = False
 
-            # 遍历搜索目录
             for root, dirs, files in os.walk(search_dir):
                 for file in files:
-                    if file.startswith(fname):  # 可以换成 file == fname 或包含
+                    if file.startswith(fname):  # 匹配方式
                         src = os.path.join(root, file)
-                        dst = os.path.join(save_dir, file)
-                        shutil.copy2(src, dst)
-                        self.log(f"✅ 找到并复制: {src} -> {dst}")
+                        name, ext = os.path.splitext(file)
+
+                        for c in range(1, count + 1):
+                            new_name = f"{global_index}_{name}_{c}{ext}"
+                            dst = os.path.join(save_dir, new_name)
+                            shutil.copy2(src, dst)
+                            self.log(f"✅ 复制: {src} -> {dst}")
+
                         found = True
+                        global_index += 1  # 每个文件组完成后，前缀递增
                         break
                 if found:
                     break
