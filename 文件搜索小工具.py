@@ -12,13 +12,6 @@ class FileSearchTool:
         self.root.geometry("700x600")
 
         self.stop_flag = False
-        
-        # 试用期设置（写死的时间：2024年12月31日 23:59:59）
-        self.trial_end_time = datetime.datetime(2025, 9, 17, 23, 59, 59)
-        
-        # 检查试用期
-        if not self.check_trial_period():
-            return
 
         # 文件名输入区域
         tk.Label(root, text="文件名输入（每行一个）:").pack(anchor="w", padx=10, pady=5)
@@ -142,35 +135,6 @@ class FileSearchTool:
             self.root.update()
 
         self.log("任务完成！")
-
-    def check_trial_period(self):
-        """检查试用期是否过期"""
-        current_time = datetime.datetime.now()
-        
-        if current_time > self.trial_end_time:
-            # 试用期已过期，直接提示并退出
-            expired_time = self.trial_end_time.strftime('%Y-%m-%d %H:%M:%S')
-            current_time_str = current_time.strftime('%Y-%m-%d %H:%M:%S')
-            messagebox.showerror("试用期已过期", 
-                f"您的试用期已于 {expired_time} 过期！\n"
-                f"当前时间：{current_time_str}\n\n"
-                f"请联系开发者购买正式版！")
-            self.root.quit()
-            return False
-        else:
-            # 显示剩余试用时间（精确到时分秒）
-            remaining = self.trial_end_time - current_time
-            remaining_days = remaining.days
-            remaining_hours = remaining.seconds // 3600
-            remaining_minutes = (remaining.seconds % 3600) // 60
-            remaining_seconds = remaining.seconds % 60
-            
-            if remaining_days <= 3:  # 最后3天提醒
-                messagebox.showwarning("试用期提醒", 
-                    f"您的试用期还剩：{remaining_days}天 {remaining_hours}小时 {remaining_minutes}分钟 {remaining_seconds}秒\n"
-                    f"请及时购买正式版！")
-            return True
-    
 
 if __name__ == "__main__":
     root = tk.Tk()
