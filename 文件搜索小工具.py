@@ -8,13 +8,13 @@ import datetime
 class FileSearchTool:
     def __init__(self, root):
         self.root = root
-        self.root.title("文件搜索小工具")
+        self.root.title("文件搜索小工具V1.1")
         self.root.geometry("700x600")
 
         self.stop_flag = False
 
         # 文件名输入区域
-        tk.Label(root, text="文件名输入（每行一个）:").pack(anchor="w", padx=10, pady=5)
+        tk.Label(root, text="请输入文件名 & 数量（每行一个）:").pack(anchor="w", padx=10, pady=5)
         self.filename_text = scrolledtext.ScrolledText(root, height=8)
         self.filename_text.pack(fill="x", padx=10)
 
@@ -98,38 +98,41 @@ class FileSearchTool:
         t = threading.Thread(target=self.search_files, args=(filenames, search_dir, save_dir))
         t.start()
 
-
     def search_files(self, filenames, search_dir, save_dir):
-        global_index = 1  # 全局序号前缀
+        global_index = 1  # 全局序号前缀（每一行关键字一个序号）
 
         for i, (fname, count) in enumerate(filenames, start=1):
             if self.stop_flag:
                 self.log("搜索已中断！")
                 break
 
-            self.log(f"[{i}/{len(filenames)}] 正在搜索: {fname} (需要 {count} 份)")
-            found = False
-
+            # 收集所有匹配到的文件（前缀匹配）
+            matches = []
             for root, dirs, files in os.walk(search_dir):
                 for file in files:
-                    if file.startswith(fname):  # 匹配方式
-                        src = os.path.join(root, file)
-                        name, ext = os.path.splitext(file)
+                    if file.startswith(fname):  # 依然使用前缀匹配
+                        matches.append(os.path.join(root, file))
 
-                        for c in range(1, count + 1):
-                            new_name = f"{global_index}_{name}_{c}{ext}"
-                            dst = os.path.join(save_dir, new_name)
-                            shutil.copy2(src, dst)
-                            self.log(f"✅ 复制: {src} -> {dst}")
+            if not matches:
+                self.log(f"[{i}/{len(filenames)}] ❌ 未找到: {fname}")
+                self.progress["value"] = i
+                self.root.update()
+                continue
 
-                        found = True
-                        global_index += 1  # 每个文件组完成后，前缀递增
-                        break
-                if found:
-                    break
+            # 日志：找到多少个候选文件
+            self.log(f"[{i}/{len(filenames)}] ✅ 找到 {len(matches)} 个匹配: {fname} (每个复制 {count} 份)")
 
-            if not found:
-                self.log(f"❌ 未找到: {fname}")
+            # 对同一关键字下的所有匹配文件，逐个复制；该关键字的全局前缀保持一致
+            for src in sorted(matches):
+                name, ext = os.path.splitext(os.path.basename(src))
+                for c in range(1, count + 1):
+                    new_name = f"{global_index}_{name}_{c}{ext}"
+                    dst = os.path.join(save_dir, new_name)
+                    shutil.copy2(src, dst)
+                    self.log(f"   → 复制: {src} -> {dst}")
+
+            # 这一行（一个关键字）处理完后，再递增全局前缀
+            global_index += 1
 
             self.progress["value"] = i
             self.root.update()
