@@ -30,11 +30,36 @@ check_trial()
 # =============== 工具函数 ===============
 
 def parse_pair_name(filename: str):
-    """解析文件名，支持 (1)/(2)、-1/-2、(1)_1 这类结尾"""
+    """
+    支持：
+    1) xxx (1)_1.jpg / xxx (2)_1.jpg   -> key=xxx_sub, part=1/2
+    2) xxx-1.jpg / xxx_2.jpg           -> key=xxx, part=1/2
+    3) xxx (1).jpg / xxx (2).jpg       -> key=xxx, part=1/2
+    """
     stem = Path(filename).stem.strip()
-    m = re.match(r'^(?P<key>.+?)(?:[\(\-\s_])(?P<part>[12])(?:[\)\s_].*)?$', stem)
+
+    # 情况1：(1)_1 / (2)_1
+    m = re.match(r'^(?P<base>.+?)\s*\((?P<part>[12])\)\s*[_\-\s](?P<sub>\d+)\s*$', stem)
     if m:
-        return m.group("key").strip(), int(m.group("part"))
+        base = m.group('base').strip()
+        part = int(m.group('part'))
+        sub  = m.group('sub').strip()
+        return f'{base}_{sub}', part
+
+    # 情况2：-1 / _2 / 空格1
+    m = re.match(r'^(?P<base>.+?)[_\-\s](?P<part>[12])\s*$', stem)
+    if m:
+        base = m.group('base').strip()
+        part = int(m.group('part'))
+        return base, part
+
+    # 情况3：(1) / (2)
+    m = re.match(r'^(?P<base>.+?)\s*\((?P<part>[12])\)\s*$', stem)
+    if m:
+        base = m.group('base').strip()
+        part = int(m.group('part'))
+        return base, part
+
     return None, None
 
 
