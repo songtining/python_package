@@ -31,36 +31,39 @@ check_trial()
 
 def parse_pair_name(filename: str):
     """
-    支持：
-    1) xxx (1)_1.jpg / xxx (2)_1.jpg   -> key=xxx_sub, part=1/2
-    2) xxx-1.jpg / xxx_2.jpg           -> key=xxx, part=1/2
-    3) xxx (1).jpg / xxx (2).jpg       -> key=xxx, part=1/2
+    解析文件名，返回 (key, part, subgroup)
+    - key: 主键
+    - part: 1 或 2，如果缺失可能为 None
+    - subgroup: 子组序号，默认 0
     """
     stem = Path(filename).stem.strip()
 
-    # 情况1：(1)_1 / (2)_1
-    m = re.match(r'^(?P<base>.+?)\s*\((?P<part>[12])\)\s*[_\-\s](?P<sub>\d+)\s*$', stem)
+    # 1. "xxx (1)_2" 或 "xxx (2)_1"
+    m = re.match(r'^(?P<key>.+?)\s*\((?P<part>[12])\)_?(?P<sub>\d+)?$', stem)
     if m:
-        base = m.group('base').strip()
-        part = int(m.group('part'))
-        sub  = m.group('sub').strip()
-        return f'{base}_{sub}', part
+        return m.group("key"), int(m.group("part")), int(m.group("sub") or 0)
 
-    # 情况2：-1 / _2 / 空格1
-    m = re.match(r'^(?P<base>.+?)[_\-\s](?P<part>[12])\s*$', stem)
+    # 2. "xxx-1_1" 或 "xxx-2_2"
+    m = re.match(r'^(?P<key>.+?)-(?P<part>[12])_?(?P<sub>\d+)?$', stem)
     if m:
-        base = m.group('base').strip()
-        part = int(m.group('part'))
-        return base, part
+        return m.group("key"), int(m.group("part")), int(m.group("sub") or 0)
 
-    # 情况3：(1) / (2)
-    m = re.match(r'^(?P<base>.+?)\s*\((?P<part>[12])\)\s*$', stem)
+    # 3. "xxx (1)" 或 "xxx (2)"
+    m = re.match(r'^(?P<key>.+?)\s*\((?P<part>[12])\)$', stem)
     if m:
-        base = m.group('base').strip()
-        part = int(m.group('part'))
-        return base, part
+        return m.group("key"), int(m.group("part")), 0
 
-    return None, None
+    # 4. "xxx-1" 或 "xxx-2"
+    m = re.match(r'^(?P<key>.+?)-(?P<part>[12])$', stem)
+    if m:
+        return m.group("key"), int(m.group("part")), 0
+
+    # 5. "xxx_1" （缺少 part）
+    m = re.match(r'^(?P<key>.+?)_(?P<sub>\d+)$', stem)
+    if m:
+        return m.group("key"), None, int(m.group("sub"))
+
+    return stem, None, 0
 
 
 def get_image_dpi(img: Image.Image, default_dpi=300):
@@ -229,18 +232,21 @@ class CoupletProcessorApp:
         files = [p for p in in_dir.iterdir() if p.is_file() and p.suffix.lower() in (".jpg", ".jpeg", ".png")]
 
         groups = {}
-        for p in files:
-            key, part = parse_pair_name(p.name)
-            if not key or part not in (1, 2):
-                self.log(f"跳过未匹配文件名：{p.name}")
-                continue
-            groups.setdefault(key, {})[part] = p
+        for f in files:
+            key, part, sub = parse_pair_name(f.name)
+            groups.setdefault((key, sub), {})
+            if part is None:
+                if 2 in groups[(key, sub)]:
+                    part = 1
+                else:
+                    part = 2
+            groups[(key, sub)][part] = f
 
         pairs = [(k, v) for k, v in groups.items() if 1 in v and 2 in v]
         total = len(pairs)
         done = 0
 
-        for key, pair in pairs:
+        for (key, sub), pair in pairs:  # 解构 (key, sub)
             if self.stop_flag: break
             try:
                 img1 = Image.open(pair[1]).convert("RGB")
@@ -261,11 +267,15 @@ class CoupletProcessorApp:
 
                 w_cm, h_cm = get_size_cm(merged, dpi, top_margin_cm=top_cm)
                 bucket_dir = ensure_folder(out_dir / f"{w_cm}x{h_cm}cm")
-                out_path = bucket_dir / f"{key}.jpg"
+
+                # 🔑 这里拼接 key 和 sub，避免出现 ('key', sub) 形式
+                out_name = f"{key}_{sub}.jpg" if sub != 0 else f"{key}.jpg"
+                out_path = bucket_dir / out_name
+
                 merged.save(out_path, format="JPEG", quality=95, dpi=(dpi, dpi))
-                self.log(f"✅ {key} -> {out_path}")
+                self.log(f"✅ {key}_{sub} -> {out_path}")
             except Exception as e:
-                self.log(f"❌ {key} 处理失败: {e}")
+                self.log(f"❌ {key}_{sub} 处理失败: {e}")
 
             done += 1
             self.progress["value"] = int(done * 100 / max(1, total))
