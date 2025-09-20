@@ -7,25 +7,6 @@ import tkinter as tk
 from tkinter import filedialog, ttk, scrolledtext, messagebox
 from pathlib import Path
 from PIL import Image, ImageDraw
-import datetime
-import sys
-
-# =============== 试用期限制 ===============
-TRIAL_EXPIRE_DATE = datetime.date(2025, 9, 20)  # 设置试用期截止日期
-
-def check_trial():
-    today = datetime.date.today()
-    if today > TRIAL_EXPIRE_DATE:
-        root = tk.Tk()
-        root.withdraw()  # 隐藏主窗口
-        messagebox.showerror(
-            "试用期已到期",
-            f"您的试用期已于 {TRIAL_EXPIRE_DATE} 到期，无法继续使用。\n请联系管理员获取正式版本。"
-        )
-        sys.exit(0)
-
-# 先检查试用期
-check_trial()
 
 # =============== 工具函数 ===============
 
