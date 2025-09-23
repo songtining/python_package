@@ -91,8 +91,8 @@ def convert_rgb_to_cmyk_jpeg(input_jpg, output_jpg, ps_app=None):
 class CoupletProcessorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("对联图片处理小工具")
-        self.root.geometry("960x800")
+        self.root.title("图片合并处理小工具V1.1")
+        self.root.geometry("960x850")
 
         self.stop_flag = False
         self.psApp = None
