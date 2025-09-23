@@ -92,7 +92,7 @@ class CoupletProcessorApp:
     def __init__(self, root):
         self.root = root
         self.root.title("图片合并处理小工具V1.1")
-        self.root.geometry("960x850")
+        self.root.geometry("900x950")
 
         self.stop_flag = False
         self.psApp = None
