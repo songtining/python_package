@@ -364,7 +364,7 @@ class CoupletProcessorApp:
         total = len(pairs); done = 0
         saved_jpgs = []  # 第一阶段保存完成的 RGB JPG 列表
 
-        for (key, sub), pair in pairs:
+        for gk, pair in pairs:
             if self.stop_flag: break
             try:
                 img1 = resize_to_target(Image.open(pair[1]).convert("RGB"), target_w_cm, target_h_cm, dpi)
@@ -381,7 +381,10 @@ class CoupletProcessorApp:
 
                 w_cm, h_cm = get_size_cm(merged, dpi, top_margin_cm=top_cm)
                 bucket_dir = ensure_folder(out_dir / f"{w_cm}x{h_cm}cm")
-                out_name = f"{key}_{sub}.jpg" if sub != 0 else f"{key}.jpg"
+                # 按照分组中的“第一张文件名”作为输出名（不带扩展名）
+                first_file = pair[1] if 1 in pair else pair[2]
+                base_stem = Path(first_file.name).stem
+                out_name = f"{base_stem}.jpg"
                 out_path = bucket_dir / out_name
                 merged.save(out_path, format="JPEG", quality=95, dpi=(dpi, dpi))
                 self.log(f"✅ 已输出: {out_path}")
@@ -389,7 +392,7 @@ class CoupletProcessorApp:
                 saved_jpgs.append((out_path, w_cm, h_cm))
 
             except Exception as e:
-                self.log(f"❌ {key}_{sub} 处理失败: {e}")
+                self.log(f"❌ 处理失败: group={gk}, 错误: {e}")
             done += 1
             self.progress["value"] = int(done * 100 / max(1, total))
             self.root.update_idletasks()
