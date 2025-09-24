@@ -40,12 +40,18 @@ def parse_pair_name(filename: str):
     if m:
         return m.group("key"), None, int(m.group("sub"))
 
-    # 6. ✅ 特殊处理: key-<part>--<sub>
+    # 6. ✅ 特殊处理（你给的样例）：任意前缀 + -<part>--<任意数字>--<sub>
+    #    如：0225...-38191485013-1--1--1 → part=1, sub=1
+    m = re.match(r'^(?P<key>.+)-(?P<part>[12])--\d+--(?P<sub>\d+)$', stem)
+    if m:
+        return m.group("key"), int(m.group("part")), int(m.group("sub"))
+
+    # 7. ✅ 特殊处理: key-<part>--<sub>
     m = re.match(r'^(?P<key>.+?)-(?P<part>[12])--(?P<sub>\d+)$', stem)
     if m:
         return m.group("key"), int(m.group("part")), int(m.group("sub"))
 
-    # 7. ✅ 特殊处理: key-<part>--1--<sub>
+    # 8. ✅ 特殊处理: key-<part>--1--<sub>
     m = re.match(r'^(?P<key>.+?)-(?P<part>[12])--1--(?P<sub>\d+)$', stem)
     if m:
         return m.group("key"), int(m.group("part")), int(m.group("sub"))
