@@ -8,6 +8,8 @@ from tkinter import filedialog, ttk, scrolledtext, messagebox
 from pathlib import Path
 from PIL import Image, ImageDraw
 import win32com.client
+import os
+import traceback
 
 # =============== 工具函数 ===============
 
@@ -67,23 +69,61 @@ def resize_to_target(img: Image.Image, target_w_cm: float,
     return img.resize((target_w, target_h), Image.LANCZOS)
 
 # =============== Photoshop 转换函数 ===============
-def convert_rgb_to_cmyk_jpeg(input_jpg, output_jpg, ps_app=None):
+def convert_rgb_to_cmyk_jpeg(input_img, output_jpg, ps_app=None, log_func=print):
     try:
+        log_func(f"➡️ 开始处理 {input_img} → {output_jpg}")
         if ps_app is None:
+            log_func("🚀 初始化 Photoshop 实例...")
             ps_app = win32com.client.Dispatch("Photoshop.Application")
-            ps_app.DisplayDialogs = 3
-        doc = ps_app.Open(input_jpg)
-        if doc.Mode != 3:  # 3 = psCMYKMode
+            ps_app.DisplayDialogs = 2
+
+        if ps_app.Documents.Count > 0:
+            log_func("⚠️ 关闭 Photoshop 中的遗留文档")
+            ps_app.Documents.Close(SaveChanges=False)
+
+        # 如果不是 TIF，先转成临时 TIF
+        tmp_tif = None
+        if not input_img.lower().endswith(".tif"):
+            tmp_tif = input_img + ".tmp.tif"
+            log_func(f"📝 输入文件非 TIF，生成临时 TIF: {tmp_tif}")
+            Image.open(input_img).save(tmp_tif, "TIFF", compression="tiff_lzw")
+            input_path = tmp_tif
+        else:
+            input_path = input_img
+
+        log_func("📂 Photoshop 打开文件中...")
+        doc = ps_app.Open(input_path)
+        if not doc:
+            log_func(f"❌ 无法打开 {input_path}")
+            return False
+
+        log_func(f"📏 当前模式: {doc.Mode} (3=CMYK, 4=RGB)")
+        if doc.Mode != 3:
+            log_func("🎨 转换为 CMYK 模式...")
             doc.ChangeMode(3)
             doc.Save()
+
+        log_func("💾 配置 JPEG 保存参数...")
         options = win32com.client.Dispatch("Photoshop.JPEGSaveOptions")
         options.Quality = 12
         options.Matte = 1
+
+        if os.path.exists(output_jpg):
+            log_func("⚠️ 目标文件已存在，删除旧文件")
+            os.remove(output_jpg)
+
+        log_func("💾 保存为 JPEG (CMYK 模式)")
         doc.SaveAs(output_jpg, options, True)
-        doc.Close()
+        doc.Close(SaveChanges=False)
+        log_func(f"✅ 已成功保存 CMYK 文件: {output_jpg}")
+
+        if tmp_tif and os.path.exists(tmp_tif):
+            log_func(f"🗑️ 删除临时文件: {tmp_tif}")
+            os.remove(tmp_tif)
+
         return True
     except Exception as e:
-        print(f"CMYK 转换失败: {e}")
+        log_func(f"❌ CMYK 转换失败: {e}\n{traceback.format_exc()}")
         return False
 
 # =============== 主应用 ===============
@@ -91,7 +131,7 @@ def convert_rgb_to_cmyk_jpeg(input_jpg, output_jpg, ps_app=None):
 class CoupletProcessorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("图片合并处理小工具V1.1")
+        self.root.title("图片合并处理小工具V1.2")
         self.root.geometry("1050x700")
 
         self.stop_flag = False
@@ -187,8 +227,9 @@ class CoupletProcessorApp:
 
         self.stop_flag = False
         if self.psApp is None and self.cmyk_var.get():
+            self.log("🚀 启动 Photoshop...")
             self.psApp = win32com.client.Dispatch("Photoshop.Application")
-            self.psApp.DisplayDialogs = 3
+            self.psApp.DisplayDialogs = 2
 
         if self.merge_var.get():
             t = threading.Thread(target=self.process_pairs,
@@ -238,8 +279,7 @@ class CoupletProcessorApp:
                 if self.cmyk_var.get():
                     bucket_dir_cmyk = ensure_folder(out_dir / f"{w_cm}x{h_cm}cm_cmyk")
                     cmyk_path = bucket_dir_cmyk / out_name
-                    if convert_rgb_to_cmyk_jpeg(str(out_path), str(cmyk_path), self.psApp):
-                        self.log(f"🎨 已转换为 CMYK: {cmyk_path}")
+                    convert_rgb_to_cmyk_jpeg(str(out_path), str(cmyk_path), self.psApp, self.log)
 
             except Exception as e:
                 self.log(f"❌ {key}_{sub} 处理失败: {e}")
@@ -272,8 +312,7 @@ class CoupletProcessorApp:
                 if self.cmyk_var.get():
                     bucket_dir_cmyk = ensure_folder(out_dir / f"{w_cm}x{h_cm}cm_cmyk")
                     cmyk_path = bucket_dir_cmyk / out_path.name
-                    if convert_rgb_to_cmyk_jpeg(str(out_path), str(cmyk_path), self.psApp):
-                        self.log(f"🎨 已转换为 CMYK: {cmyk_path}")
+                    convert_rgb_to_cmyk_jpeg(str(out_path), str(cmyk_path), self.psApp, self.log)
 
             except Exception as e:
                 self.log(f"❌ {p.name} 处理失败: {e}")
