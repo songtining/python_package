@@ -11,18 +11,46 @@ import win32com.client
 
 # =============== 工具函数 ===============
 
+
 def parse_pair_name(filename: str):
     stem = Path(filename).stem.strip()
+
+    # 1. 处理括号格式: xxx(1)_2
     m = re.match(r'^(?P<key>.+?)\s*\((?P<part>[12])\)_?(?P<sub>\d+)?$', stem)
-    if m: return m.group("key"), int(m.group("part")), int(m.group("sub") or 0)
+    if m:
+        return m.group("key"), int(m.group("part")), int(m.group("sub") or 0)
+
+    # 2. 处理 -1_2 这种: xxx-1_2
     m = re.match(r'^(?P<key>.+?)-(?P<part>[12])_?(?P<sub>\d+)?$', stem)
-    if m: return m.group("key"), int(m.group("part")), int(m.group("sub") or 0)
+    if m:
+        return m.group("key"), int(m.group("part")), int(m.group("sub") or 0)
+
+    # 3. 处理括号无子图: xxx(1)
     m = re.match(r'^(?P<key>.+?)\s*\((?P<part>[12])\)$', stem)
-    if m: return m.group("key"), int(m.group("part")), 0
+    if m:
+        return m.group("key"), int(m.group("part")), 0
+
+    # 4. 处理 -1 这种: xxx-1
     m = re.match(r'^(?P<key>.+?)-(?P<part>[12])$', stem)
-    if m: return m.group("key"), int(m.group("part")), 0
+    if m:
+        return m.group("key"), int(m.group("part")), 0
+
+    # 5. 处理 xxx_1
     m = re.match(r'^(?P<key>.+?)_(?P<sub>\d+)$', stem)
-    if m: return m.group("key"), None, int(m.group("sub"))
+    if m:
+        return m.group("key"), None, int(m.group("sub"))
+
+    # 6. ✅ 特殊处理: key-<part>--<sub>
+    m = re.match(r'^(?P<key>.+?)-(?P<part>[12])--(?P<sub>\d+)$', stem)
+    if m:
+        return m.group("key"), int(m.group("part")), int(m.group("sub"))
+
+    # 7. ✅ 特殊处理: key-<part>--1--<sub>
+    m = re.match(r'^(?P<key>.+?)-(?P<part>[12])--1--(?P<sub>\d+)$', stem)
+    if m:
+        return m.group("key"), int(m.group("part")), int(m.group("sub"))
+
+    # 默认
     return stem, None, 0
 
 def get_image_dpi(img: Image.Image, default_dpi=300):
@@ -66,34 +94,50 @@ def resize_to_target(img: Image.Image, target_w_cm: float,
     target_h = cm_to_px(target_h_cm, dpi)
     return img.resize((target_w, target_h), Image.LANCZOS)
 
+# =============== 导出辅助 ===============
+def save_as_tif(image: Image.Image, tif_path, dpi: int):
+    """以无损 LZW 压缩方式保存为 TIF，并写入 DPI"""
+    image.save(tif_path, format="TIFF", compression="tiff_lzw", dpi=(dpi, dpi))
+
 # =============== Photoshop 转换函数 ===============
 def convert_rgb_to_cmyk_jpeg(input_jpg, output_jpg, ps_app=None, log_func=print):
     try:
+        # 统一转为字符串绝对路径，避免 COM 路径解析问题
+        input_path = str(Path(input_jpg).resolve())
+        output_path = str(Path(output_jpg).resolve())
+
         if ps_app is None:
             log_func("🚀 启动 Photoshop...")
             ps_app = win32com.client.Dispatch("Photoshop.Application")
-            ps_app.DisplayDialogs = 2  # 静默模式
+            # 与已验证脚本保持一致
+            ps_app.DisplayDialogs = 3  # 完全静默，不弹对话框
 
-        log_func(f"➡ 打开文件: {input_jpg}")
-        doc = ps_app.Open(str(input_jpg))
+        log_func(f"➡ 打开文件: {input_path}")
+        doc = ps_app.Open(input_path)
 
         if doc is None:
-            log_func(f"❌ 无法打开文件: {input_jpg}")
+            log_func(f"❌ 无法打开文件: {input_path}")
             return False
 
+        # 确保转换为 CMYK
         if doc.Mode != 3:  # 3 = psCMYKMode
             log_func("🎨 转换为 CMYK 模式")
             doc.ChangeMode(3)
+            # 与旧脚本一致，先保存一次（防止某些版本要求）
             doc.Save()
 
-        log_func(f"💾 保存为 JPEG: {output_jpg}")
+        # JPEG 保存选项
+        log_func(f"💾 保存为 JPEG: {output_path}")
         options = win32com.client.Dispatch("Photoshop.JPEGSaveOptions")
         options.Quality = 12
-        options.Matte = 1
-        doc.SaveAs(str(output_jpg), options, True)
+        options.Matte = 1  # 1 = psNoMatte
 
-        doc.Close(SaveChanges=False)
-        log_func(f"✅ CMYK 转换完成: {output_jpg}")
+        # 保存为 JPEG（与老脚本参数保持一致）
+        doc.SaveAs(output_path, options, True)
+
+        # 关闭文档（与老脚本保持一致，不传 SaveChanges）
+        doc.Close()
+        log_func(f"✅ CMYK 转换完成: {output_path}")
         return True
 
     except Exception as e:
@@ -105,7 +149,7 @@ def convert_rgb_to_cmyk_jpeg(input_jpg, output_jpg, ps_app=None, log_func=print)
 class CoupletProcessorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("图片合并处理小工具 V1.3")
+        self.root.title("自动调图软件（图片合并 & CMYK模式转换）V2.0")
         self.root.geometry("1100x750")
 
         self.stop_flag = False
@@ -224,15 +268,24 @@ class CoupletProcessorApp:
             if part is None: part = 1 if 2 in groups[(key, sub)] else 2
             groups[(key, sub)][part] = f
 
-        # 打印分组结果
+        # 打印分组结果（更清晰的“第N组”格式）
         self.log("📂 文件分组结果：")
         unpaired = []
-        for (key, sub), parts in groups.items():
-            files_info = ", ".join([f"part{p}:{f.name}" for p, f in parts.items()])
-            if 1 in parts and 2 in parts:
-                self.log(f"  ✅ 配对完成 ▶ {key}_{sub} => {files_info}")
+
+        # 为了输出稳定，先对 groups 排序
+        sorted_items = sorted(groups.items(), key=lambda kv: (str(kv[0][0]), int(kv[0][1]) if isinstance(kv[0][1], int) else -1))
+
+        group_index = 1
+        for (key, sub), parts in sorted_items:
+            has1 = 1 in parts
+            has2 = 2 in parts
+            if has1 and has2:
+                self.log(f"第{group_index}组：")
+                self.log(parts[1].name)
+                self.log(parts[2].name)
+                group_index += 1
             else:
-                self.log(f"  ❌ 未配对 ▶ {key}_{sub} => {files_info}")
+                files_info = ", ".join([f"part{p}:{f.name}" for p, f in parts.items()])
                 unpaired.append((key, sub, files_info))
 
         # 如果有未配对文件，单独打印总结
@@ -243,6 +296,7 @@ class CoupletProcessorApp:
 
         pairs = [(k, v) for k, v in groups.items() if 1 in v and 2 in v]
         total = len(pairs); done = 0
+        saved_jpgs = []  # 第一阶段保存完成的 RGB JPG 列表
 
         for (key, sub), pair in pairs:
             if self.stop_flag: break
@@ -265,11 +319,8 @@ class CoupletProcessorApp:
                 out_path = bucket_dir / out_name
                 merged.save(out_path, format="JPEG", quality=95, dpi=(dpi, dpi))
                 self.log(f"✅ 已输出: {out_path}")
-
-                if self.cmyk_var.get():
-                    bucket_dir_cmyk = ensure_folder(out_dir / f"{w_cm}x{h_cm}cm_cmyk")
-                    cmyk_path = bucket_dir_cmyk / out_name
-                    convert_rgb_to_cmyk_jpeg(out_path, cmyk_path, self.psApp, self.log)
+                # 记录用于第二阶段批量 CMYK 转换
+                saved_jpgs.append((out_path, w_cm, h_cm))
 
             except Exception as e:
                 self.log(f"❌ {key}_{sub} 处理失败: {e}")
@@ -278,10 +329,50 @@ class CoupletProcessorApp:
             self.root.update_idletasks()
         self.log("🎉 成对合并任务完成")
 
+        # 第二阶段：批量转换为 CMYK（如勾选）
+        if self.cmyk_var.get() and saved_jpgs:
+            try:
+                if self.psApp is None:
+                    self.log("🚀 启动 Photoshop...")
+                    self.psApp = win32com.client.Dispatch("Photoshop.Application")
+                    self.psApp.DisplayDialogs = 2
+            except Exception as e:
+                self.log(f"❌ 启动 Photoshop 失败: {e}")
+                return
+
+            self.log("▶ 开始第二阶段：批量转换 CMYK...")
+            total2 = len(saved_jpgs); done2 = 0
+            for out_path, w_cm, h_cm in saved_jpgs:
+                if self.stop_flag: break
+                try:
+                    # 生成中间 TIF
+                    tif_path = out_path.with_suffix(".tif")
+                    self.log(f"📝 生成中间 TIF: {tif_path}")
+                    with Image.open(out_path) as _img:
+                        save_as_tif(_img, tif_path, dpi)
+
+                    bucket_dir_cmyk = ensure_folder(out_dir / f"{w_cm}x{h_cm}cm_cmyk")
+                    cmyk_path = bucket_dir_cmyk / out_path.name
+                    convert_rgb_to_cmyk_jpeg(tif_path, cmyk_path, self.psApp, self.log)
+
+                    # 清理中间文件
+                    try:
+                        Path(tif_path).unlink(missing_ok=True)
+                        self.log(f"🧹 已删除中间 TIF: {tif_path}")
+                    except Exception as e:
+                        self.log(f"⚠️ 删除中间 TIF 失败: {e}")
+                except Exception as e:
+                    self.log(f"❌ CMYK 转换失败: {e}")
+                done2 += 1
+                self.progress["value"] = int(done2 * 100 / max(1, total2))
+                self.root.update_idletasks()
+            self.log("🎉 第二阶段 CMYK 转换完成")
+
     # ---------- 单图处理 ----------
     def process_single(self, in_dir, out_dir, dpi, top_cm, line_w, target_w_cm, target_h_cm):
         files = [p for p in in_dir.iterdir() if p.is_file() and p.suffix.lower() in (".jpg", ".jpeg", ".png")]
         total = len(files); done = 0
+        saved_jpgs = []
 
         for p in files:
             if self.stop_flag: break
@@ -299,11 +390,7 @@ class CoupletProcessorApp:
                 out_path = bucket_dir / f"{p.stem}.jpg"
                 canvas.save(out_path, dpi=(dpi, dpi))
                 self.log(f"✅ 已输出: {out_path}")
-
-                if self.cmyk_var.get():
-                    bucket_dir_cmyk = ensure_folder(out_dir / f"{w_cm}x{h_cm}cm_cmyk")
-                    cmyk_path = bucket_dir_cmyk / out_path.name
-                    convert_rgb_to_cmyk_jpeg(out_path, cmyk_path, self.psApp, self.log)
+                saved_jpgs.append((out_path, w_cm, h_cm))
 
             except Exception as e:
                 self.log(f"❌ {p.name} 处理失败: {e}")
@@ -311,6 +398,45 @@ class CoupletProcessorApp:
             self.progress["value"] = int(done * 100 / max(1, total))
             self.root.update_idletasks()
         self.log("🎉 单图缩放任务完成")
+
+        # 第二阶段：批量转换为 CMYK（如勾选）
+        if self.cmyk_var.get() and saved_jpgs:
+            try:
+                if self.psApp is None:
+                    self.log("🚀 启动 Photoshop...")
+                    self.psApp = win32com.client.Dispatch("Photoshop.Application")
+                    self.psApp.DisplayDialogs = 2
+            except Exception as e:
+                self.log(f"❌ 启动 Photoshop 失败: {e}")
+                return
+
+            self.log("▶ 开始第二阶段：批量转换 CMYK...")
+            total2 = len(saved_jpgs); done2 = 0
+            for out_path, w_cm, h_cm in saved_jpgs:
+                if self.stop_flag: break
+                try:
+                    # 生成中间 TIF
+                    tif_path = out_path.with_suffix(".tif")
+                    self.log(f"📝 生成中间 TIF: {tif_path}")
+                    with Image.open(out_path) as _img:
+                        save_as_tif(_img, tif_path, dpi)
+
+                    bucket_dir_cmyk = ensure_folder(out_dir / f"{w_cm}x{h_cm}cm_cmyk")
+                    cmyk_path = bucket_dir_cmyk / out_path.name
+                    convert_rgb_to_cmyk_jpeg(tif_path, cmyk_path, self.psApp, self.log)
+
+                    # 清理中间文件
+                    try:
+                        Path(tif_path).unlink(missing_ok=True)
+                        self.log(f"🧹 已删除中间 TIF: {tif_path}")
+                    except Exception as e:
+                        self.log(f"⚠️ 删除中间 TIF 失败: {e}")
+                except Exception as e:
+                    self.log(f"❌ CMYK 转换失败: {e}")
+                done2 += 1
+                self.progress["value"] = int(done2 * 100 / max(1, total2))
+                self.root.update_idletasks()
+            self.log("🎉 第二阶段 CMYK 转换完成")
 
 # =============== 入口 ===============
 if __name__ == "__main__":
