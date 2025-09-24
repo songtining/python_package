@@ -8,8 +8,6 @@ from tkinter import filedialog, ttk, scrolledtext, messagebox
 from pathlib import Path
 from PIL import Image, ImageDraw
 import win32com.client
-import os
-import traceback
 
 # =============== 工具函数 ===============
 
@@ -69,61 +67,37 @@ def resize_to_target(img: Image.Image, target_w_cm: float,
     return img.resize((target_w, target_h), Image.LANCZOS)
 
 # =============== Photoshop 转换函数 ===============
-def convert_rgb_to_cmyk_jpeg(input_img, output_jpg, ps_app=None, log_func=print):
+def convert_rgb_to_cmyk_jpeg(input_jpg, output_jpg, ps_app=None, log_func=print):
     try:
-        log_func(f"➡️ 开始处理 {input_img} → {output_jpg}")
         if ps_app is None:
-            log_func("🚀 初始化 Photoshop 实例...")
+            log_func("🚀 启动 Photoshop...")
             ps_app = win32com.client.Dispatch("Photoshop.Application")
-            ps_app.DisplayDialogs = 2
+            ps_app.DisplayDialogs = 2  # 静默模式
 
-        if ps_app.Documents.Count > 0:
-            log_func("⚠️ 关闭 Photoshop 中的遗留文档")
-            ps_app.Documents.Close(SaveChanges=False)
+        log_func(f"➡ 打开文件: {input_jpg}")
+        doc = ps_app.Open(str(input_jpg))
 
-        # 如果不是 TIF，先转成临时 TIF
-        tmp_tif = None
-        if not input_img.lower().endswith(".tif"):
-            tmp_tif = input_img + ".tmp.tif"
-            log_func(f"📝 输入文件非 TIF，生成临时 TIF: {tmp_tif}")
-            Image.open(input_img).save(tmp_tif, "TIFF", compression="tiff_lzw")
-            input_path = tmp_tif
-        else:
-            input_path = input_img
-
-        log_func("📂 Photoshop 打开文件中...")
-        doc = ps_app.Open(input_path)
-        if not doc:
-            log_func(f"❌ 无法打开 {input_path}")
+        if doc is None:
+            log_func(f"❌ 无法打开文件: {input_jpg}")
             return False
 
-        log_func(f"📏 当前模式: {doc.Mode} (3=CMYK, 4=RGB)")
-        if doc.Mode != 3:
-            log_func("🎨 转换为 CMYK 模式...")
+        if doc.Mode != 3:  # 3 = psCMYKMode
+            log_func("🎨 转换为 CMYK 模式")
             doc.ChangeMode(3)
             doc.Save()
 
-        log_func("💾 配置 JPEG 保存参数...")
+        log_func(f"💾 保存为 JPEG: {output_jpg}")
         options = win32com.client.Dispatch("Photoshop.JPEGSaveOptions")
         options.Quality = 12
         options.Matte = 1
+        doc.SaveAs(str(output_jpg), options, True)
 
-        if os.path.exists(output_jpg):
-            log_func("⚠️ 目标文件已存在，删除旧文件")
-            os.remove(output_jpg)
-
-        log_func("💾 保存为 JPEG (CMYK 模式)")
-        doc.SaveAs(output_jpg, options, True)
         doc.Close(SaveChanges=False)
-        log_func(f"✅ 已成功保存 CMYK 文件: {output_jpg}")
-
-        if tmp_tif and os.path.exists(tmp_tif):
-            log_func(f"🗑️ 删除临时文件: {tmp_tif}")
-            os.remove(tmp_tif)
-
+        log_func(f"✅ CMYK 转换完成: {output_jpg}")
         return True
+
     except Exception as e:
-        log_func(f"❌ CMYK 转换失败: {e}\n{traceback.format_exc()}")
+        log_func(f"❌ CMYK 转换失败: {str(e)}")
         return False
 
 # =============== 主应用 ===============
@@ -131,19 +105,18 @@ def convert_rgb_to_cmyk_jpeg(input_img, output_jpg, ps_app=None, log_func=print)
 class CoupletProcessorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("图片合并处理小工具V1.2")
-        self.root.geometry("1050x700")
+        self.root.title("图片合并处理小工具 V1.3")
+        self.root.geometry("1100x750")
 
         self.stop_flag = False
         self.psApp = None
 
-        # 输入目录
+        # 输入输出目录
         row1 = tk.Frame(root); row1.pack(fill="x", padx=10, pady=6)
         tk.Label(row1, text="输入目录:").pack(side="left")
         self.in_entry = tk.Entry(row1); self.in_entry.pack(side="left", fill="x", expand=True, padx=6)
         tk.Button(row1, text="选择目录", command=self.choose_in_dir).pack(side="right")
 
-        # 输出目录
         row2 = tk.Frame(root); row2.pack(fill="x", padx=10, pady=6)
         tk.Label(row2, text="输出目录:").pack(side="left")
         self.out_entry = tk.Entry(row2); self.out_entry.pack(side="left", fill="x", expand=True, padx=6)
@@ -151,7 +124,6 @@ class CoupletProcessorApp:
 
         # 选项
         row3 = tk.Frame(root); row3.pack(fill="x", padx=10, pady=6)
-
         self.merge_var = tk.BooleanVar(value=True)
         tk.Checkbutton(row3, text="先合并上下联（场景1）",
                        variable=self.merge_var).pack(side="left", padx=4)
@@ -171,7 +143,7 @@ class CoupletProcessorApp:
         tk.Label(row3, text="目标高(cm):").pack(side="left", padx=(16, 4))
         self.target_h_entry = tk.Entry(row3, width=6); self.target_h_entry.insert(0, "180"); self.target_h_entry.pack(side="left")
 
-        # 新增：是否转换为 CMYK
+        # 是否转换为 CMYK
         self.cmyk_var = tk.BooleanVar(value=True)
         tk.Checkbutton(row3, text="是否转换为CMYK模式",
                        variable=self.cmyk_var).pack(side="left", padx=(20, 4))
@@ -183,15 +155,15 @@ class CoupletProcessorApp:
 
         # 日志
         tk.Label(root, text="过程日志:").pack(anchor="w", padx=10)
-        self.log_text = scrolledtext.ScrolledText(root, height=18)
+        self.log_text = scrolledtext.ScrolledText(root, height=20)
         self.log_text.pack(fill="both", expand=True, padx=10, pady=(0, 8))
 
         # 进度条
         tk.Label(root, text="进度:").pack(anchor="w", padx=10)
-        self.progress = ttk.Progressbar(root, orient="horizontal", mode="determinate", length=800)
+        self.progress = ttk.Progressbar(root, orient="horizontal", mode="determinate", length=1000)
         self.progress.pack(fill="x", padx=10, pady=8)
 
-    # ---------- 交互 ----------
+    # ---------- 工具函数 ----------
     def choose_in_dir(self):
         p = filedialog.askdirectory()
         if p: self.in_entry.delete(0, tk.END); self.in_entry.insert(0, p)
@@ -207,6 +179,7 @@ class CoupletProcessorApp:
     def stop(self):
         self.stop_flag = True; self.log("⚠️ 用户请求停止...")
 
+    # ---------- 启动 ----------
     def start(self):
         in_dir = Path(self.in_entry.get().strip())
         out_dir = Path(self.out_entry.get().strip())
@@ -241,7 +214,7 @@ class CoupletProcessorApp:
                                  daemon=True)
         t.start()
 
-    # ---------- 核心处理 ----------
+    # ---------- 成对处理 ----------
     def process_pairs(self, in_dir, out_dir, dpi, top_cm, line_w, target_w_cm, target_h_cm):
         files = [p for p in in_dir.iterdir() if p.is_file() and p.suffix.lower() in (".jpg", ".jpeg", ".png")]
         groups = {}
@@ -250,6 +223,23 @@ class CoupletProcessorApp:
             groups.setdefault((key, sub), {})
             if part is None: part = 1 if 2 in groups[(key, sub)] else 2
             groups[(key, sub)][part] = f
+
+        # 打印分组结果
+        self.log("📂 文件分组结果：")
+        unpaired = []
+        for (key, sub), parts in groups.items():
+            files_info = ", ".join([f"part{p}:{f.name}" for p, f in parts.items()])
+            if 1 in parts and 2 in parts:
+                self.log(f"  ✅ 配对完成 ▶ {key}_{sub} => {files_info}")
+            else:
+                self.log(f"  ❌ 未配对 ▶ {key}_{sub} => {files_info}")
+                unpaired.append((key, sub, files_info))
+
+        # 如果有未配对文件，单独打印总结
+        if unpaired:
+            self.log("⚠️ 未成对文件列表：")
+            for key, sub, files_info in unpaired:
+                self.log(f"   - {key}_{sub}: {files_info}")
 
         pairs = [(k, v) for k, v in groups.items() if 1 in v and 2 in v]
         total = len(pairs); done = 0
@@ -274,12 +264,12 @@ class CoupletProcessorApp:
                 out_name = f"{key}_{sub}.jpg" if sub != 0 else f"{key}.jpg"
                 out_path = bucket_dir / out_name
                 merged.save(out_path, format="JPEG", quality=95, dpi=(dpi, dpi))
-                self.log(f"✅ {key}_{sub} -> {out_path}")
+                self.log(f"✅ 已输出: {out_path}")
 
                 if self.cmyk_var.get():
                     bucket_dir_cmyk = ensure_folder(out_dir / f"{w_cm}x{h_cm}cm_cmyk")
                     cmyk_path = bucket_dir_cmyk / out_name
-                    convert_rgb_to_cmyk_jpeg(str(out_path), str(cmyk_path), self.psApp, self.log)
+                    convert_rgb_to_cmyk_jpeg(out_path, cmyk_path, self.psApp, self.log)
 
             except Exception as e:
                 self.log(f"❌ {key}_{sub} 处理失败: {e}")
@@ -288,6 +278,7 @@ class CoupletProcessorApp:
             self.root.update_idletasks()
         self.log("🎉 成对合并任务完成")
 
+    # ---------- 单图处理 ----------
     def process_single(self, in_dir, out_dir, dpi, top_cm, line_w, target_w_cm, target_h_cm):
         files = [p for p in in_dir.iterdir() if p.is_file() and p.suffix.lower() in (".jpg", ".jpeg", ".png")]
         total = len(files); done = 0
@@ -307,12 +298,12 @@ class CoupletProcessorApp:
                 bucket_dir = ensure_folder(out_dir / f"{w_cm}x{h_cm}cm")
                 out_path = bucket_dir / f"{p.stem}.jpg"
                 canvas.save(out_path, dpi=(dpi, dpi))
-                self.log(f"✅ {p.name} -> {out_path}")
+                self.log(f"✅ 已输出: {out_path}")
 
                 if self.cmyk_var.get():
                     bucket_dir_cmyk = ensure_folder(out_dir / f"{w_cm}x{h_cm}cm_cmyk")
                     cmyk_path = bucket_dir_cmyk / out_path.name
-                    convert_rgb_to_cmyk_jpeg(str(out_path), str(cmyk_path), self.psApp, self.log)
+                    convert_rgb_to_cmyk_jpeg(out_path, cmyk_path, self.psApp, self.log)
 
             except Exception as e:
                 self.log(f"❌ {p.name} 处理失败: {e}")
