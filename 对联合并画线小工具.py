@@ -243,10 +243,6 @@ class CoupletProcessorApp:
         except: target_h_cm = 180
 
         self.stop_flag = False
-        if self.psApp is None and self.cmyk_var.get():
-            self.log("🚀 启动 Photoshop...")
-            self.psApp = win32com.client.Dispatch("Photoshop.Application")
-            self.psApp.DisplayDialogs = 2
 
         if self.merge_var.get():
             t = threading.Thread(target=self.process_pairs,
@@ -335,7 +331,7 @@ class CoupletProcessorApp:
                 if self.psApp is None:
                     self.log("🚀 启动 Photoshop...")
                     self.psApp = win32com.client.Dispatch("Photoshop.Application")
-                    self.psApp.DisplayDialogs = 2
+                    self.psApp.DisplayDialogs = 3
             except Exception as e:
                 self.log(f"❌ 启动 Photoshop 失败: {e}")
                 return
@@ -405,7 +401,7 @@ class CoupletProcessorApp:
                 if self.psApp is None:
                     self.log("🚀 启动 Photoshop...")
                     self.psApp = win32com.client.Dispatch("Photoshop.Application")
-                    self.psApp.DisplayDialogs = 2
+                    self.psApp.DisplayDialogs = 3
             except Exception as e:
                 self.log(f"❌ 启动 Photoshop 失败: {e}")
                 return
