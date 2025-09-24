@@ -59,6 +59,28 @@ def parse_pair_name(filename: str):
     # 默认
     return stem, None, 0
 
+def parse_triplet_pattern(filename: str):
+    """解析末尾三段型 ...-a--b--c，返回 (base, a, b, c)，否则返回 (base, None, None, 0)
+    适配两种规律：
+    - 规律A：...-1--x--x / ...-2--x--x  → 按 a(1/2) 配对，c 常为 1
+    - 规律B：...-x--x--1 / ...-x--x--2  → 按 c(1/2) 配对，a 常为 1
+    """
+    stem = Path(filename).stem.strip()
+    if "--" in stem:
+        parts = stem.split("--")
+        if len(parts) >= 3:
+            c_str = parts[-1]
+            b_str = parts[-2]
+            left = "--".join(parts[:-2])
+            m_a = re.search(r"-(?P<a>[0-9]+)$", left)
+            if m_a and c_str.isdigit():
+                a_val = int(m_a.group("a"))
+                b_val = int(b_str) if b_str.isdigit() else None
+                c_val = int(c_str)
+                base = left[: -(len(m_a.group(0)))]  # 去掉 -<a>
+                return base, a_val, b_val, c_val
+    return stem, None, None, 0
+
 def get_image_dpi(img: Image.Image, default_dpi=300):
     dpi = img.info.get('dpi')
     if isinstance(dpi, tuple) and len(dpi) >= 2:
@@ -264,7 +286,37 @@ class CoupletProcessorApp:
     def process_pairs(self, in_dir, out_dir, dpi, top_cm, line_w, target_w_cm, target_h_cm):
         files = [p for p in in_dir.iterdir() if p.is_file() and p.suffix.lower() in (".jpg", ".jpeg", ".png")]
         groups = {}
+        # 预扫描：以最后一段 1/2 的前缀做直配候选
+        last_pair_candidates = {}
+        stems = [p.stem for p in files]
+        for stem in stems:
+            if "--" in stem:
+                base_last, last = stem.rsplit("--", 1)
+                if last.isdigit() and int(last) in (1, 2):
+                    d = last_pair_candidates.setdefault(base_last, set())
+                    d.add(int(last))
+
         for f in files:
+            base, a, b, c = parse_triplet_pattern(f.name)
+
+            # 第一优先：若存在“仅最后一位不同 1/2”的前缀，按该前缀直配
+            stem = f.stem
+            if "--" in stem:
+                base_last, last = stem.rsplit("--", 1)
+                if last.isdigit() and int(last) in (1, 2):
+                    present = last_pair_candidates.get(base_last, set())
+                    if present == {1, 2}:
+                        groups.setdefault((base_last, 'last_c'), {})[int(last)] = f
+                        continue
+
+            # 第二优先：先规律A（确保 c==1 的 1/2 成为同一组），再规律B
+            if a in (1, 2) and c == 1:
+                groups.setdefault((base, 'vary_a', b, c), {})[a] = f
+                continue
+            if c in (1, 2) and a == 1:
+                groups.setdefault((base, 'vary_c', a, b), {})[c] = f
+                continue
+            # 兜底：退回旧解析
             key, part, sub = parse_pair_name(f.name)
             groups.setdefault((key, sub), {})
             if part is None: part = 1 if 2 in groups[(key, sub)] else 2
@@ -275,26 +327,38 @@ class CoupletProcessorApp:
         unpaired = []
 
         # 为了输出稳定，先对 groups 排序
-        sorted_items = sorted(groups.items(), key=lambda kv: (str(kv[0][0]), int(kv[0][1]) if isinstance(kv[0][1], int) else -1))
+        # 对 key 结构做适配：('base','last_c') 或 ('base','vary_a',b,c) 或 ('base','vary_c',a,b) 或 (key, sub)
+        def sort_key(item):
+            k = item[0]
+            if isinstance(k, tuple) and len(k) >= 2 and k[1] == 'last_c':
+                return (str(k[0]), 'last_c')
+            if isinstance(k, tuple) and len(k) >= 2 and k[1] in ('vary_a','vary_c'):
+                return (str(k[0]), str(k[1]), str(k[2]), str(k[3]) if len(k) > 3 else '')
+            if isinstance(k, tuple) and len(k) == 2:
+                return (str(k[0]), str(k[1]))
+            return (str(k), '')
+        sorted_items = sorted(groups.items(), key=sort_key)
 
         group_index = 1
-        for (key, sub), parts in sorted_items:
+        for gk, parts in sorted_items:
             has1 = 1 in parts
             has2 = 2 in parts
             if has1 and has2:
-                self.log(f"第{group_index}组：")
+                # 标注使用的规律
+                rule = 'last_c' if (isinstance(gk, tuple) and len(gk)>=2 and gk[1]=='last_c') else ('vary_a' if (isinstance(gk, tuple) and len(gk)>=2 and gk[1]=='vary_a') else ('vary_c' if (isinstance(gk, tuple) and len(gk)>=2 and gk[1]=='vary_c') else 'fallback'))
+                self.log(f"第{group_index}组：[{rule}]")
                 self.log(parts[1].name)
                 self.log(parts[2].name)
                 group_index += 1
             else:
                 files_info = ", ".join([f"part{p}:{f.name}" for p, f in parts.items()])
-                unpaired.append((key, sub, files_info))
+                unpaired.append((gk, files_info))
 
         # 如果有未配对文件，单独打印总结
         if unpaired:
             self.log("⚠️ 未成对文件列表：")
-            for key, sub, files_info in unpaired:
-                self.log(f"   - {key}_{sub}: {files_info}")
+            for gk, files_info in unpaired:
+                self.log(f"   - {gk}: {files_info}")
 
         pairs = [(k, v) for k, v in groups.items() if 1 in v and 2 in v]
         total = len(pairs); done = 0
