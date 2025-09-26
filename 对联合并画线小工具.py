@@ -8,6 +8,7 @@ from tkinter import filedialog, ttk, scrolledtext, messagebox
 from pathlib import Path
 from PIL import Image, ImageDraw
 import win32com.client
+import sys
 
 # =============== 工具函数 ===============
 
@@ -136,9 +137,7 @@ def convert_rgb_to_cmyk_jpeg(input_jpg, output_jpg, ps_app=None, log_func=print)
 
         if ps_app is None:
             log_func("🚀 启动 Photoshop...")
-            ps_app = win32com.client.Dispatch("Photoshop.Application")
-            # 与已验证脚本保持一致
-            ps_app.DisplayDialogs = 3  # 完全静默，不弹对话框
+            ps_app = get_photoshop_app(log_func)
 
         log_func(f"➡ 打开文件: {input_path}")
         doc = ps_app.Open(input_path)
@@ -171,6 +170,46 @@ def convert_rgb_to_cmyk_jpeg(input_jpg, output_jpg, ps_app=None, log_func=print)
     except Exception as e:
         log_func(f"❌ CMYK 转换失败: {str(e)}")
         return False
+
+def get_photoshop_app(log_func=print):
+    """健壮获取 Photoshop COM 对象。
+    - 仅支持 Windows；
+    - 依次尝试多个 ProgID；
+    - 优先 EnsureDispatch，再回退 Dispatch；
+    - 统一设置 DisplayDialogs=3。
+    """
+    if not sys.platform.startswith('win'):
+        raise RuntimeError("当前系统不是 Windows，无法使用 Photoshop COM 接口")
+
+    progids = [
+        # 通用/较新版本
+        "Photoshop.Application",
+        "Photoshop.Application.2025",
+        "Photoshop.Application.2024",
+        "Photoshop.Application.2023",
+        "Photoshop.Application.2022",
+        # 旧版本/CS 系列（包含 CS6 常见标识）
+        "Photoshop.Application.CS6",
+        "Photoshop.Application.60",
+    ]
+    last_err = None
+    for pid in progids:
+        try:
+            log_func(f"尝试使用 ProgID: {pid}")
+            try:
+                app = win32com.client.gencache.EnsureDispatch(pid)
+            except Exception:
+                app = win32com.client.Dispatch(pid)
+            # 设置静默模式
+            try:
+                app.DisplayDialogs = 3
+            except Exception:
+                pass
+            return app
+        except Exception as e:
+            last_err = e
+    # 统一抛错，提示排查路径
+    raise RuntimeError(f"无法启动 Photoshop COM，请确认已安装并可正常启动。原始错误: {last_err}")
 
 # =============== 主应用 ===============
 
@@ -403,8 +442,7 @@ class CoupletProcessorApp:
             try:
                 if self.psApp is None:
                     self.log("🚀 启动 Photoshop...")
-                    self.psApp = win32com.client.Dispatch("Photoshop.Application")
-                    self.psApp.DisplayDialogs = 3
+                    self.psApp = get_photoshop_app(self.log)
             except Exception as e:
                 self.log(f"❌ 启动 Photoshop 失败: {e}")
                 return
@@ -473,8 +511,7 @@ class CoupletProcessorApp:
             try:
                 if self.psApp is None:
                     self.log("🚀 启动 Photoshop...")
-                    self.psApp = win32com.client.Dispatch("Photoshop.Application")
-                    self.psApp.DisplayDialogs = 3
+                    self.psApp = get_photoshop_app(self.log)
             except Exception as e:
                 self.log(f"❌ 启动 Photoshop 失败: {e}")
                 return
