@@ -1,3 +1,2 @@
 Pillow
 pywin32
-pythoncom
