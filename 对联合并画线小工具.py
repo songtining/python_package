@@ -9,9 +9,22 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 import win32com.client
 import sys
+import pythoncom
+import functools
+
+# =============== 装饰器 ===============
+def com_thread(func):
+    """保证线程内自动初始化/释放 COM"""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        pythoncom.CoInitialize()
+        try:
+            return func(*args, **kwargs)
+        finally:
+            pythoncom.CoUninitialize()
+    return wrapper
 
 # =============== 工具函数 ===============
-
 
 def parse_pair_name(filename: str):
     stem = Path(filename).stem.strip()
@@ -41,18 +54,17 @@ def parse_pair_name(filename: str):
     if m:
         return m.group("key"), None, int(m.group("sub"))
 
-    # 6. ✅ 特殊处理（你给的样例）：任意前缀 + -<part>--<任意数字>--<sub>
-    #    如：0225...-38191485013-1--1--1 → part=1, sub=1
+    # 6. 特殊处理：任意前缀 + -<part>--<任意数字>--<sub>
     m = re.match(r'^(?P<key>.+)-(?P<part>[12])--\d+--(?P<sub>\d+)$', stem)
     if m:
         return m.group("key"), int(m.group("part")), int(m.group("sub"))
 
-    # 7. ✅ 特殊处理: key-<part>--<sub>
+    # 7. 特殊处理: key-<part>--<sub>
     m = re.match(r'^(?P<key>.+?)-(?P<part>[12])--(?P<sub>\d+)$', stem)
     if m:
         return m.group("key"), int(m.group("part")), int(m.group("sub"))
 
-    # 8. ✅ 特殊处理: key-<part>--1--<sub>
+    # 8. 特殊处理: key-<part>--1--<sub>
     m = re.match(r'^(?P<key>.+?)-(?P<part>[12])--1--(?P<sub>\d+)$', stem)
     if m:
         return m.group("key"), int(m.group("part")), int(m.group("sub"))
@@ -172,12 +184,7 @@ def convert_rgb_to_cmyk_jpeg(input_jpg, output_jpg, ps_app=None, log_func=print)
         return False
 
 def get_photoshop_app(log_func=print):
-    """健壮获取 Photoshop COM 对象。
-    - 仅支持 Windows；
-    - 依次尝试多个 ProgID；
-    - 优先 EnsureDispatch，再回退 Dispatch；
-    - 统一设置 DisplayDialogs=3。
-    """
+    """健壮获取 Photoshop COM 对象。"""
     if not sys.platform.startswith('win'):
         raise RuntimeError("当前系统不是 Windows，无法使用 Photoshop COM 接口")
 
@@ -216,7 +223,7 @@ def get_photoshop_app(log_func=print):
 class CoupletProcessorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("自动调图软件（图片合并 & CMYK模式转换）V2.0")
+        self.root.title("自动调图软件（图片合并 & CMYK模式转换）V3.0")
         self.root.geometry("1100x750")
 
         self.stop_flag = False
@@ -322,6 +329,7 @@ class CoupletProcessorApp:
         t.start()
 
     # ---------- 成对处理 ----------
+    @com_thread
     def process_pairs(self, in_dir, out_dir, dpi, top_cm, line_w, target_w_cm, target_h_cm):
         files = [p for p in in_dir.iterdir() if p.is_file() and p.suffix.lower() in (".jpg", ".jpeg", ".png")]
         groups = {}
@@ -366,7 +374,6 @@ class CoupletProcessorApp:
         unpaired = []
 
         # 为了输出稳定，先对 groups 排序
-        # 对 key 结构做适配：('base','last_c') 或 ('base','vary_a',b,c) 或 ('base','vary_c',a,b) 或 (key, sub)
         def sort_key(item):
             k = item[0]
             if isinstance(k, tuple) and len(k) >= 2 and k[1] == 'last_c':
@@ -383,7 +390,6 @@ class CoupletProcessorApp:
             has1 = 1 in parts
             has2 = 2 in parts
             if has1 and has2:
-                # 标注使用的规律
                 rule = 'last_c' if (isinstance(gk, tuple) and len(gk)>=2 and gk[1]=='last_c') else ('vary_a' if (isinstance(gk, tuple) and len(gk)>=2 and gk[1]=='vary_a') else ('vary_c' if (isinstance(gk, tuple) and len(gk)>=2 and gk[1]=='vary_c') else 'fallback'))
                 self.log(f"第{group_index}组：[{rule}]")
                 self.log(parts[1].name)
@@ -393,7 +399,6 @@ class CoupletProcessorApp:
                 files_info = ", ".join([f"part{p}:{f.name}" for p, f in parts.items()])
                 unpaired.append((gk, files_info))
 
-        # 如果有未配对文件，单独打印总结
         if unpaired:
             self.log("⚠️ 未成对文件列表：")
             for gk, files_info in unpaired:
@@ -420,14 +425,12 @@ class CoupletProcessorApp:
 
                 w_cm, h_cm = get_size_cm(merged, dpi, top_margin_cm=top_cm)
                 bucket_dir = ensure_folder(out_dir / f"{w_cm}x{h_cm}cm")
-                # 按照分组中的“第一张文件名”作为输出名（不带扩展名）
                 first_file = pair[1] if 1 in pair else pair[2]
                 base_stem = Path(first_file.name).stem
                 out_name = f"{base_stem}.jpg"
                 out_path = bucket_dir / out_name
                 merged.save(out_path, format="JPEG", quality=95, dpi=(dpi, dpi))
                 self.log(f"✅ 已输出: {out_path}")
-                # 记录用于第二阶段批量 CMYK 转换
                 saved_jpgs.append((out_path, w_cm, h_cm))
 
             except Exception as e:
@@ -452,7 +455,6 @@ class CoupletProcessorApp:
             for out_path, w_cm, h_cm in saved_jpgs:
                 if self.stop_flag: break
                 try:
-                    # 生成中间 TIF
                     tif_path = out_path.with_suffix(".tif")
                     self.log(f"📝 生成中间 TIF: {tif_path}")
                     with Image.open(out_path) as _img:
@@ -462,7 +464,6 @@ class CoupletProcessorApp:
                     cmyk_path = bucket_dir_cmyk / out_path.name
                     convert_rgb_to_cmyk_jpeg(tif_path, cmyk_path, self.psApp, self.log)
 
-                    # 清理中间文件
                     try:
                         Path(tif_path).unlink(missing_ok=True)
                         self.log(f"🧹 已删除中间 TIF: {tif_path}")
@@ -476,6 +477,7 @@ class CoupletProcessorApp:
             self.log("🎉 第二阶段 CMYK 转换完成")
 
     # ---------- 单图处理 ----------
+    @com_thread
     def process_single(self, in_dir, out_dir, dpi, top_cm, line_w, target_w_cm, target_h_cm):
         files = [p for p in in_dir.iterdir() if p.is_file() and p.suffix.lower() in (".jpg", ".jpeg", ".png")]
         total = len(files); done = 0
@@ -521,7 +523,6 @@ class CoupletProcessorApp:
             for out_path, w_cm, h_cm in saved_jpgs:
                 if self.stop_flag: break
                 try:
-                    # 生成中间 TIF
                     tif_path = out_path.with_suffix(".tif")
                     self.log(f"📝 生成中间 TIF: {tif_path}")
                     with Image.open(out_path) as _img:
@@ -531,7 +532,6 @@ class CoupletProcessorApp:
                     cmyk_path = bucket_dir_cmyk / out_path.name
                     convert_rgb_to_cmyk_jpeg(tif_path, cmyk_path, self.psApp, self.log)
 
-                    # 清理中间文件
                     try:
                         Path(tif_path).unlink(missing_ok=True)
                         self.log(f"🧹 已删除中间 TIF: {tif_path}")
