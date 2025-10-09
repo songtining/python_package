@@ -31,5 +31,5 @@ jobs:
     - name: Upload EXE
       uses: actions/upload-artifact@v4  # 更新为 v4 版本
       with:
-        name: 图片调整打孔处理小工具
-        path: dist/图片尺寸调整打孔小工具.exe
+        name: Image-punching-processing
+        path: dist/Image-punching-processing.exe
