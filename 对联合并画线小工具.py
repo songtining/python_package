@@ -11,6 +11,9 @@ import win32com.client
 import sys
 import pythoncom
 import functools
+import os
+import time
+import traceback
 
 # =============== 装饰器 ===============
 def com_thread(func):
@@ -138,14 +141,17 @@ def resize_to_target(img: Image.Image, target_w_cm: float,
 # =============== 导出辅助 ===============
 def save_as_tif(image: Image.Image, tif_path, dpi: int):
     """以无损 LZW 压缩方式保存为 TIF，并写入 DPI"""
+    Path(tif_path).parent.mkdir(parents=True, exist_ok=True)
     image.save(tif_path, format="TIFF", compression="tiff_lzw", dpi=(dpi, dpi))
 
 # =============== Photoshop 转换函数 ===============
 def convert_rgb_to_cmyk_jpeg(input_jpg, output_jpg, ps_app=None, log_func=print):
+    """在同一线程内复用传入的 ps_app；不跨线程复用"""
     try:
-        # 统一转为字符串绝对路径，避免 COM 路径解析问题
+        # 绝对路径 & 输出目录
         input_path = str(Path(input_jpg).resolve())
         output_path = str(Path(output_jpg).resolve())
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
         if ps_app is None:
             log_func("🚀 启动 Photoshop...")
@@ -153,49 +159,58 @@ def convert_rgb_to_cmyk_jpeg(input_jpg, output_jpg, ps_app=None, log_func=print)
 
         log_func(f"➡ 打开文件: {input_path}")
         doc = ps_app.Open(input_path)
-
         if doc is None:
             log_func(f"❌ 无法打开文件: {input_path}")
             return False
 
-        # 确保转换为 CMYK
-        if doc.Mode != 3:  # 3 = psCMYKMode
+        # 3 = psCMYKMode（避免魔法数可用 constants.psCMYK）
+        if getattr(doc, "Mode", None) != 3:
             log_func("🎨 转换为 CMYK 模式")
             doc.ChangeMode(3)
-            # 与旧脚本一致，先保存一次（防止某些版本要求）
-            doc.Save()
+            # 有些版本切换模式后必须先保存一次
+            try:
+                doc.Save()
+            except Exception:
+                pass
 
-        # JPEG 保存选项
         log_func(f"💾 保存为 JPEG: {output_path}")
         options = win32com.client.Dispatch("Photoshop.JPEGSaveOptions")
         options.Quality = 12
-        options.Matte = 1  # 1 = psNoMatte
+        try:
+            options.Matte = 1  # 1 = psNoMatte（部分版本可无此属性）
+        except Exception:
+            pass
+        try:
+            options.EmbedColorProfile = True
+        except Exception:
+            pass
 
-        # 保存为 JPEG（与老脚本参数保持一致）
+        # SaveAs(SaveIn, Options, AsCopy)
         doc.SaveAs(output_path, options, True)
+        # 2 = psDoNotSaveChanges
+        try:
+            doc.Close(2)
+        except Exception:
+            doc.Close()
 
-        # 关闭文档（与老脚本保持一致，不传 SaveChanges）
-        doc.Close()
         log_func(f"✅ CMYK 转换完成: {output_path}")
         return True
 
     except Exception as e:
-        log_func(f"❌ CMYK 转换失败: {str(e)}")
+        log_func(f"❌ CMYK 转换失败: {e}\n{traceback.format_exc()}")
         return False
 
 def get_photoshop_app(log_func=print):
-    """健壮获取 Photoshop COM 对象。"""
+    """健壮获取 Photoshop COM 对象（每线程独立实例）"""
     if not sys.platform.startswith('win'):
         raise RuntimeError("当前系统不是 Windows，无法使用 Photoshop COM 接口")
 
     progids = [
-        # 通用/较新版本
         "Photoshop.Application",
         "Photoshop.Application.2025",
         "Photoshop.Application.2024",
         "Photoshop.Application.2023",
         "Photoshop.Application.2022",
-        # 旧版本/CS 系列（包含 CS6 常见标识）
         "Photoshop.Application.CS6",
         "Photoshop.Application.60",
     ]
@@ -207,15 +222,15 @@ def get_photoshop_app(log_func=print):
                 app = win32com.client.gencache.EnsureDispatch(pid)
             except Exception:
                 app = win32com.client.Dispatch(pid)
-            # 设置静默模式
             try:
-                app.DisplayDialogs = 3
+                app.DisplayDialogs = 3  # psDisplayNoDialogs
             except Exception:
                 pass
+            # 给 Photoshop 一点时间完全就绪
+            time.sleep(5)
             return app
         except Exception as e:
             last_err = e
-    # 统一抛错，提示排查路径
     raise RuntimeError(f"无法启动 Photoshop COM，请确认已安装并可正常启动。原始错误: {last_err}")
 
 # =============== 主应用 ===============
@@ -223,11 +238,10 @@ def get_photoshop_app(log_func=print):
 class CoupletProcessorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("自动调图软件（图片合并 & CMYK模式转换）V3.0")
+        self.root.title("自动调图软件（图片合并 & CMYK模式转换）V3.1")
         self.root.geometry("1100x750")
 
         self.stop_flag = False
-        self.psApp = None
 
         # 输入输出目录
         row1 = tk.Frame(root); row1.pack(fill="x", padx=10, pady=6)
@@ -356,7 +370,7 @@ class CoupletProcessorApp:
                         groups.setdefault((base_last, 'last_c'), {})[int(last)] = f
                         continue
 
-            # 第二优先：先规律A（确保 c==1 的 1/2 成为同一组），再规律B
+            # 第二优先：先规律A，再规律B
             if a in (1, 2) and c == 1:
                 groups.setdefault((base, 'vary_a', b, c), {})[a] = f
                 continue
@@ -369,11 +383,10 @@ class CoupletProcessorApp:
             if part is None: part = 1 if 2 in groups[(key, sub)] else 2
             groups[(key, sub)][part] = f
 
-        # 打印分组结果（更清晰的“第N组”格式）
+        # 打印分组结果
         self.log("📂 文件分组结果：")
         unpaired = []
 
-        # 为了输出稳定，先对 groups 排序
         def sort_key(item):
             k = item[0]
             if isinstance(k, tuple) and len(k) >= 2 and k[1] == 'last_c':
@@ -443,9 +456,8 @@ class CoupletProcessorApp:
         # 第二阶段：批量转换为 CMYK（如勾选）
         if self.cmyk_var.get() and saved_jpgs:
             try:
-                if self.psApp is None:
-                    self.log("🚀 启动 Photoshop...")
-                    self.psApp = get_photoshop_app(self.log)
+                self.log("🚀 启动 Photoshop...")
+                psApp = get_photoshop_app(self.log)  # ✅ 每线程内局部实例
             except Exception as e:
                 self.log(f"❌ 启动 Photoshop 失败: {e}")
                 return
@@ -455,6 +467,7 @@ class CoupletProcessorApp:
             for out_path, w_cm, h_cm in saved_jpgs:
                 if self.stop_flag: break
                 try:
+                    # 生成中间 TIF
                     tif_path = out_path.with_suffix(".tif")
                     self.log(f"📝 生成中间 TIF: {tif_path}")
                     with Image.open(out_path) as _img:
@@ -462,8 +475,10 @@ class CoupletProcessorApp:
 
                     bucket_dir_cmyk = ensure_folder(out_dir / f"{w_cm}x{h_cm}cm_cmyk")
                     cmyk_path = bucket_dir_cmyk / out_path.name
-                    convert_rgb_to_cmyk_jpeg(tif_path, cmyk_path, self.psApp, self.log)
 
+                    convert_rgb_to_cmyk_jpeg(tif_path, cmyk_path, psApp, self.log)
+
+                    # 清理中间文件
                     try:
                         Path(tif_path).unlink(missing_ok=True)
                         self.log(f"🧹 已删除中间 TIF: {tif_path}")
@@ -511,9 +526,8 @@ class CoupletProcessorApp:
         # 第二阶段：批量转换为 CMYK（如勾选）
         if self.cmyk_var.get() and saved_jpgs:
             try:
-                if self.psApp is None:
-                    self.log("🚀 启动 Photoshop...")
-                    self.psApp = get_photoshop_app(self.log)
+                self.log("🚀 启动 Photoshop...")
+                psApp = get_photoshop_app(self.log)  # ✅ 每线程内局部实例
             except Exception as e:
                 self.log(f"❌ 启动 Photoshop 失败: {e}")
                 return
@@ -530,7 +544,8 @@ class CoupletProcessorApp:
 
                     bucket_dir_cmyk = ensure_folder(out_dir / f"{w_cm}x{h_cm}cm_cmyk")
                     cmyk_path = bucket_dir_cmyk / out_path.name
-                    convert_rgb_to_cmyk_jpeg(tif_path, cmyk_path, self.psApp, self.log)
+
+                    convert_rgb_to_cmyk_jpeg(tif_path, cmyk_path, psApp, self.log)
 
                     try:
                         Path(tif_path).unlink(missing_ok=True)
