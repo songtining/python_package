@@ -1,4 +1,4 @@
-name: Build 图片调整打孔处理小工具 for Windows
+name: Build 图片尺寸调整打孔处理小工具 for Windows
 
 on:
   push:
