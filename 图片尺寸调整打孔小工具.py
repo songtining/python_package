@@ -169,7 +169,7 @@ def convert_to_cmyk(input_path, output_path, ps_app=None, log_func=print):
 class ImageHoleProcessorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("图片打孔处理工具 V1.0")
+        self.root.title("图片尺寸调整 & 打孔 & 转换CMYK V1.0 试用版")
         self.root.geometry("800x700")
 
         self.stop_flag = False
@@ -395,6 +395,25 @@ class ImageHoleProcessorApp:
 
 # =============== 入口 ===============
 if __name__ == "__main__":
+    import datetime
+    import sys
+    from tkinter import messagebox
+
+    # ====== 设置试用期到期时间（精确到时分秒） ======
+    # ⚠️ 请按实际修改下面的日期时间（例如 2025-10-20 23:59:59）
+    expire_time = datetime.datetime(2025, 10, 13, 23, 59, 59)
+
+    # 获取当前系统时间
+    now = datetime.datetime.now()
+
+    # 如果超过试用期
+    if now > expire_time:
+        root = tk.Tk()
+        root.withdraw()  # 隐藏主窗口
+        messagebox.showerror("试用期已结束", f"软件试用期已到期（{expire_time}），请联系开发者获取正式版本。")
+        sys.exit(0)
+
+    # 启动主界面
     root = tk.Tk()
     app = ImageHoleProcessorApp(root)
     root.mainloop()
