@@ -55,68 +55,46 @@ def cm_to_px(cm, dpi=300):
     return int(round(cm * dpi / 2.54))
 
 def draw_holes(image, hole_count=6, hole_diameter_cm=1, margin_cm=2, dpi=300):
-    """在图片上绘制打孔点
-    
-    Args:
-        image: PIL Image对象
-        hole_count: 打孔数量 (6或8)
-        hole_diameter_cm: 圆点直径(厘米)
-        margin_cm: 距离边框距离(厘米)
-        dpi: 分辨率
-    """
+    """在图片上绘制打孔点，保证左右对称、间距均匀"""
     draw = ImageDraw.Draw(image)
-    width, height = image.size
-    
-    # 计算圆点直径和边距的像素值
-    hole_diameter_px = cm_to_px(hole_diameter_cm, dpi)
+    width_px, height_px = image.size
+    width_cm = width_px * 2.54 / dpi
+    height_cm = height_px * 2.54 / dpi
+
+    hole_radius_cm = hole_diameter_cm / 2
+    hole_radius_px = cm_to_px(hole_radius_cm, dpi)
     margin_px = cm_to_px(margin_cm, dpi)
-    
-    # 计算圆点位置
+
+    # 上下行数量
     if hole_count == 6:
-        # 顶部3个，底部3个
-        top_y = margin_px
-        bottom_y = height - margin_px
-        positions = []
-        
-        # 顶部3个点
-        for i in range(3):
-            x = margin_px + (width - 2 * margin_px) * (i + 1) / 4
-            positions.append((x, top_y))
-        
-        # 底部3个点
-        for i in range(3):
-            x = margin_px + (width - 2 * margin_px) * (i + 1) / 4
-            positions.append((x, bottom_y))
-            
+        per_row = 3
     elif hole_count == 8:
-        # 顶部4个，底部4个
-        top_y = margin_px
-        bottom_y = height - margin_px
-        positions = []
-        
-        # 顶部4个点
-        for i in range(4):
-            x = margin_px + (width - 2 * margin_px) * (i + 1) / 5
-            positions.append((x, top_y))
-        
-        # 底部4个点
-        for i in range(4):
-            x = margin_px + (width - 2 * margin_px) * (i + 1) / 5
-            positions.append((x, bottom_y))
+        per_row = 4
     else:
         raise ValueError("打孔数量只能是6或8")
-    
-    # 绘制红色圆点
-    for x, y in positions:
-        # 计算圆点边界框
-        left = x - hole_diameter_px // 2
-        top = y - hole_diameter_px // 2
-        right = x + hole_diameter_px // 2
-        bottom = y + hole_diameter_px // 2
-        
-        # 绘制红色圆点
-        draw.ellipse([left, top, right, bottom], fill='red', outline='red')
-    
+
+    # === 均匀分布算法（你想要的逻辑） ===
+    x1_cm = margin_cm + hole_radius_cm
+    xN_cm = width_cm - margin_cm - hole_radius_cm
+    if per_row > 1:
+        spacing_cm = (xN_cm - x1_cm) / (per_row - 1)
+    else:
+        spacing_cm = 0
+
+    x_positions_px = [cm_to_px(x1_cm + i * spacing_cm, dpi) for i in range(per_row)]
+
+    # 顶部和底部 y 坐标
+    top_y_px = margin_px
+    bottom_y_px = height_px - margin_px
+
+    # 绘制红色圆点（顶部+底部）
+    for y in [top_y_px, bottom_y_px]:
+        for x in x_positions_px:
+            draw.ellipse(
+                [x - hole_radius_px, y - hole_radius_px, x + hole_radius_px, y + hole_radius_px],
+                fill='red', outline='red'
+            )
+
     return image
 
 def get_photoshop_app(log_func=print):
