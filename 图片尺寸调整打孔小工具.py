@@ -206,14 +206,14 @@ class ImageHoleProcessorApp:
         tk.Radiobutton(hole_frame, text="6个", variable=self.hole_count_var, value="6").pack(side="left")
         tk.Radiobutton(hole_frame, text="8个", variable=self.hole_count_var, value="8").pack(side="left")
         
-        tk.Label(row3, text="圆点直径(cm):").pack(side="left", padx=(16, 4))
+        tk.Label(row3, text="孔圆点直径(cm):").pack(side="left", padx=(16, 4))
         self.diameter_entry = tk.Entry(row3, width=6)
         self.diameter_entry.insert(0, "1")
         self.diameter_entry.pack(side="left")
         
         tk.Label(row3, text="边距(cm):").pack(side="left", padx=(16, 4))
         self.margin_entry = tk.Entry(row3, width=6)
-        self.margin_entry.insert(0, "2")
+        self.margin_entry.insert(0, "1.5")
         self.margin_entry.pack(side="left")
 
         # 是否转换为 CMYK
@@ -401,7 +401,7 @@ if __name__ == "__main__":
 
     # ====== 设置试用期到期时间（精确到时分秒） ======
     # ⚠️ 请按实际修改下面的日期时间（例如 2025-10-20 23:59:59）
-    expire_time = datetime.datetime(2025, 10, 13, 23, 59, 59)
+    expire_time = datetime.datetime(2025, 10, 16, 23, 59, 59)
 
     # 获取当前系统时间
     now = datetime.datetime.now()
