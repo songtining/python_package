@@ -55,7 +55,7 @@ def cm_to_px(cm, dpi=300):
     return int(round(cm * dpi / 2.54))
 
 def draw_holes(image, hole_count=6, hole_diameter_cm=1, margin_cm=2, dpi=300):
-    """在图片上绘制打孔点，保证左右对称、间距均匀"""
+    """在图片上绘制打孔点，保证左右上下对称、间距均匀"""
     draw = ImageDraw.Draw(image)
     width_px, height_px = image.size
     width_cm = width_px * 2.54 / dpi
@@ -63,7 +63,6 @@ def draw_holes(image, hole_count=6, hole_diameter_cm=1, margin_cm=2, dpi=300):
 
     hole_radius_cm = hole_diameter_cm / 2
     hole_radius_px = cm_to_px(hole_radius_cm, dpi)
-    margin_px = cm_to_px(margin_cm, dpi)
 
     # 上下行数量
     if hole_count == 6:
@@ -73,19 +72,15 @@ def draw_holes(image, hole_count=6, hole_diameter_cm=1, margin_cm=2, dpi=300):
     else:
         raise ValueError("打孔数量只能是6或8")
 
-    # === 均匀分布算法（你想要的逻辑） ===
+    # === X方向：均匀分布（左右留边 + 半径） ===
     x1_cm = margin_cm + hole_radius_cm
     xN_cm = width_cm - margin_cm - hole_radius_cm
-    if per_row > 1:
-        spacing_cm = (xN_cm - x1_cm) / (per_row - 1)
-    else:
-        spacing_cm = 0
-
+    spacing_cm = (xN_cm - x1_cm) / (per_row - 1) if per_row > 1 else 0
     x_positions_px = [cm_to_px(x1_cm + i * spacing_cm, dpi) for i in range(per_row)]
 
-    # 顶部和底部 y 坐标
-    top_y_px = margin_px
-    bottom_y_px = height_px - margin_px
+    # === Y方向：上下边距同理（加半径） ===
+    top_y_px = cm_to_px(height_cm - margin_cm - hole_radius_cm, dpi)
+    bottom_y_px = cm_to_px(margin_cm + hole_radius_cm, dpi)
 
     # 绘制红色圆点（顶部+底部）
     for y in [top_y_px, bottom_y_px]:
