@@ -1,17 +1,33 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 import os
 import re
+import time
+import datetime
+import logging
+import json
+from logging.handlers import RotatingFileHandler
 import threading
-import tkinter as tk
-from tkinter import filedialog, ttk, scrolledtext, messagebox
-from pathlib import Path
+import queue
+from tkinter import *
+from tkinter import filedialog, scrolledtext
 from PIL import Image, ImageDraw
+import math
 import win32com.client
-import sys
 import pythoncom
 import functools
+Image.MAX_IMAGE_PIXELS = 1000000000  # 设置为10亿像素，适应大图
+
+# 全局变量
+folder_path = ""
+LOG_FILE = "processing_log.txt"
+MAX_LOG_FILE_SIZE = 20 * 1024 * 1024
+stop_processing = False
+MAX_LOG_LINES = 500
+scan_thread = None  # 后台线程
+CONFIG_FILE = "config.json"
+log_queue = queue.Queue()
+line_color = "white"  # 新增全局变量用于存储画线颜色
+line_width = 0.06
+horizontal_offset_options = ["6", "7"]
 
 # =============== 装饰器 ===============
 def com_thread(func):
@@ -25,36 +41,107 @@ def com_thread(func):
             pythoncom.CoUninitialize()
     return wrapper
 
-# =============== 工具函数 ===============
+# 设置日志
+def setup_logging():
+    if not os.path.exists("logs"):
+        os.makedirs("logs")
+    handler = RotatingFileHandler(f"logs/{LOG_FILE}", maxBytes=MAX_LOG_FILE_SIZE, backupCount=5)
+    handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    logging.basicConfig(level=logging.INFO, handlers=[handler])
 
-def parse_folder_dimensions(folder_name):
-    """从文件夹名称解析尺寸，支持多种格式：
-    - 30x40cm, 30x40, 30*40cm, 30*40
-    - 30x40CM, 30X40cm 等
+def load_config():
+    """ 读取配置文件，获取默认文件夹路径和画线颜色 """
+    global folder_path, line_color, line_width
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r") as config_file:
+            try:
+                config = json.load(config_file)
+                folder_path = config.get("folder_path", "")
+                # 读取画线颜色
+                line_color = config.get("line_color", "white")
+                line_width = config.get("line_width", 0.06)
+                if folder_path == "":
+                    write_log("⚠️ 配置文件格式错误，请重新配置或手动选择文件夹")
+                else:
+                    write_log(f"🔧 已加载配置文件，默认文件夹路径：{folder_path}")
+                    write_log(f"🔧 已加载配置文件，画线颜色：{line_color}")
+                    write_log(f"🔧 已加载配置文件，画线宽度：{line_width}mm")
+                    folder_label.config(text=f"已加载默认配置文件夹: {folder_path}")  # 显示加载后的路径
+                    start_button.config(state=NORMAL)  # 启用"开始处理"按钮
+            except json.JSONDecodeError:
+                write_log("⚠️ 配置文件格式错误，请重新配置或手动选择文件夹")
+    else:
+        write_log("⚠️ 配置文件不存在，请重新配置或手动选择文件夹")
+
+def write_log(message):
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_message = f"[{timestamp}] {message}"
+    log_queue.put(log_message)
+    logging.info(log_message)
+
+def update_log_window():
+    while not log_queue.empty():
+        log_text.insert(END, log_queue.get() + "\n")
+        log_text.yview(END)
+    log_text.after(500, update_log_window)
+
+def cm_to_pixels(cm, dpi=72):
+    return round(cm * dpi / 2.54)
+
+def extract_dimensions_from_folder_name(folder_name):
+    match = re.search(r'(\d+(\.\d+)?)[xX](\d+(\.\d+)?)(CM|cm)?', folder_name)
+    if match:
+        return float(match.group(1)), float(match.group(3))
+    return None
+
+
+def convert_rgb_to_cmyk_jpeg(input_tif, output_jpg):
     """
-    # 清理文件夹名称
-    name = folder_name.strip()
-    
-    # 尝试多种匹配模式
-    patterns = [
-        r'(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)\s*cm?',  # 30x40cm, 30*40CM
-        r'(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)',        # 30x40, 30*40
-    ]
-    
-    for pattern in patterns:
-        match = re.search(pattern, name, re.IGNORECASE)
-        if match:
-            width = float(match.group(1))
-            height = float(match.group(2))
-            return width, height
-    
-    return None, None
+    使用 Photoshop 将 CMYK TIF 转换为 CMYK JPEG，并保持 CMYK 颜色空间
+    :param input_tif: 输入的 TIF 文件路径
+    :param output_jpg: 输出的 JPEG 文件路径
+    """
+    # 启动 Photoshop
+    psApp = win32com.client.Dispatch("Photoshop.Application")
+    psApp.DisplayDialogs = 3  # 设为静默模式，不弹出对话框
 
-def cm_to_px(cm, dpi=300):
-    """厘米转像素"""
-    return int(round(cm * dpi / 2.54))
+    # 打开 TIF 文件
+    doc = psApp.Open(input_tif)
 
-def draw_holes(image, hole_count=6, hole_diameter_cm=1, margin_cm=2, dpi=300):
+    # 确保文档颜色模式为 CMYK
+    if doc.Mode != 3:  # 3 = psCMYKMode
+        doc.ChangeMode(3)  # 转为 CMYK
+        doc.Save()
+
+    # 设置 JPEG 保存选项
+    options = win32com.client.Dispatch("Photoshop.JPEGSaveOptions")
+    options.Quality = 12  # 最高质量 (1-12)
+    options.Matte = 1  # 1 = psNoMatte，保持透明区域
+
+    # 保存为 JPEG
+    doc.SaveAs(output_jpg, options, True)
+
+    # 关闭文档
+    doc.Close()
+
+def draw_lines_on_image(image, draw_line_color, horizontal_offset_cm=7, dpi=72):
+    """ 在图片上方指定厘米处绘制水平线，并在中央绘制垂直线 """
+    draw = ImageDraw.Draw(image)
+    width, height = image.size
+    horizontal_offset_px = cm_to_pixels(horizontal_offset_cm, dpi)
+    y_horizontal = min(horizontal_offset_px, height - 1)
+    x_vertical = width // 2
+    line_width_px = mm_to_pixels(line_width, dpi)
+    line_width_px = math.ceil(line_width_px) if line_width_px - math.floor(line_width_px) >= 0.5 else math.floor(line_width_px)
+    
+    # 画水平线 (从 (0, y) 到 (width, y))
+    draw.line([(0, y_horizontal), (width, y_horizontal)], fill=draw_line_color, width=line_width_px)
+    # 画垂直线 (从 (x, 0) 到 (x, height))
+    draw.line([(x_vertical, 0), (x_vertical, height)], fill=draw_line_color, width=line_width_px)
+    
+    return image
+
+def draw_holes_on_image(image, hole_count=6, hole_diameter_cm=1, margin_cm=2, dpi=72):
     """在图片上绘制打孔点，保证左右上下对称、间距均匀"""
     draw = ImageDraw.Draw(image)
     width_px, height_px = image.size
@@ -62,7 +149,7 @@ def draw_holes(image, hole_count=6, hole_diameter_cm=1, margin_cm=2, dpi=300):
     height_cm = height_px * 2.54 / dpi
 
     hole_radius_cm = hole_diameter_cm / 2
-    hole_radius_px = cm_to_px(hole_radius_cm, dpi)
+    hole_radius_px = cm_to_pixels(hole_radius_cm, dpi)
 
     # 上下行数量
     if hole_count == 6:
@@ -76,11 +163,11 @@ def draw_holes(image, hole_count=6, hole_diameter_cm=1, margin_cm=2, dpi=300):
     x1_cm = margin_cm + hole_radius_cm
     xN_cm = width_cm - margin_cm - hole_radius_cm
     spacing_cm = (xN_cm - x1_cm) / (per_row - 1) if per_row > 1 else 0
-    x_positions_px = [cm_to_px(x1_cm + i * spacing_cm, dpi) for i in range(per_row)]
+    x_positions_px = [cm_to_pixels(x1_cm + i * spacing_cm, dpi) for i in range(per_row)]
 
     # === Y方向：上下边距同理（加半径） ===
-    top_y_px = cm_to_px(height_cm - margin_cm - hole_radius_cm, dpi)
-    bottom_y_px = cm_to_px(margin_cm + hole_radius_cm, dpi)
+    top_y_px = cm_to_pixels(height_cm - margin_cm - hole_radius_cm, dpi)
+    bottom_y_px = cm_to_pixels(margin_cm + hole_radius_cm, dpi)
 
     # 绘制红色圆点（顶部+底部）
     for y in [top_y_px, bottom_y_px]:
@@ -92,328 +179,227 @@ def draw_holes(image, hole_count=6, hole_diameter_cm=1, margin_cm=2, dpi=300):
 
     return image
 
-def get_photoshop_app(log_func=print):
-    """健壮获取 Photoshop COM 对象"""
-    if not sys.platform.startswith('win'):
-        raise RuntimeError("当前系统不是 Windows，无法使用 Photoshop COM 接口")
+def mm_to_pixels(mm_value, dpi):
+    """将毫米转换为像素"""
+    return mm_value * (dpi / 25.4)
 
-    progids = [
-        # 通用/较新版本
-        "Photoshop.Application",
-        "Photoshop.Application.2025",
-        "Photoshop.Application.2024",
-        "Photoshop.Application.2023",
-        "Photoshop.Application.2022",
-        # 旧版本/CS 系列
-        "Photoshop.Application.CS6",
-        "Photoshop.Application.60",
-    ]
-    last_err = None
-    for pid in progids:
-        try:
-            log_func(f"尝试使用 ProgID: {pid}")
-            try:
-                app = win32com.client.gencache.EnsureDispatch(pid)
-            except Exception:
-                app = win32com.client.Dispatch(pid)
-            # 设置静默模式
-            try:
-                app.DisplayDialogs = 3
-            except Exception:
-                pass
-            return app
-        except Exception as e:
-            last_err = e
-    raise RuntimeError(f"无法启动 Photoshop COM，请确认已安装并可正常启动。原始错误: {last_err}")
+@com_thread
+def process_images_in_folder(root_folder):
+    global stop_processing
 
-def convert_to_cmyk(input_path, output_path, ps_app=None, log_func=print):
-    """使用Photoshop转换为CMYK格式"""
-    try:
-        input_path = str(Path(input_path).resolve())
-        output_path = str(Path(output_path).resolve())
+    write_log(f"📏 扫描根目录: {root_folder} 开始 ")
 
-        if ps_app is None:
-            log_func("🚀 启动 Photoshop...")
-            ps_app = get_photoshop_app(log_func)
-
-        log_func(f"➡ 打开文件: {input_path}")
-        doc = ps_app.Open(input_path)
-
-        if doc is None:
-            log_func(f"❌ 无法打开文件: {input_path}")
-            return False
-
-        # 确保转换为 CMYK
-        if doc.Mode != 3:  # 3 = psCMYKMode
-            log_func("🎨 转换为 CMYK 模式")
-            doc.ChangeMode(3)
-            doc.Save()
-
-        # JPEG 保存选项
-        log_func(f"💾 保存为 JPEG: {output_path}")
-        options = win32com.client.Dispatch("Photoshop.JPEGSaveOptions")
-        options.Quality = 12
-        options.Matte = 1
-
-        doc.SaveAs(output_path, options, True)
-        doc.Close()
-        log_func(f"✅ CMYK 转换完成: {output_path}")
-        return True
-
-    except Exception as e:
-        log_func(f"❌ CMYK 转换失败: {str(e)}")
-        return False
-
-# =============== 主应用 ===============
-
-class ImageHoleProcessorApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("图片尺寸调整 & 打孔 & 转换CMYK V1.0 试用版")
-        self.root.geometry("800x700")
-
-        self.stop_flag = False
-        self.psApp = None
-
-        # 输入输出目录
-        row1 = tk.Frame(root)
-        row1.pack(fill="x", padx=10, pady=6)
-        tk.Label(row1, text="输入目录:").pack(side="left")
-        self.in_entry = tk.Entry(row1)
-        self.in_entry.pack(side="left", fill="x", expand=True, padx=6)
-        tk.Button(row1, text="选择目录", command=self.choose_in_dir).pack(side="right")
-
-        row2 = tk.Frame(root)
-        row2.pack(fill="x", padx=10, pady=6)
-        tk.Label(row2, text="输出目录:").pack(side="left")
-        self.out_entry = tk.Entry(row2)
-        self.out_entry.pack(side="left", fill="x", expand=True, padx=6)
-        tk.Button(row2, text="选择目录", command=self.choose_out_dir).pack(side="right")
-
-        # 参数设置
-        row3 = tk.Frame(root)
-        row3.pack(fill="x", padx=10, pady=6)
-        
-        tk.Label(row3, text="DPI:").pack(side="left")
-        self.dpi_entry = tk.Entry(row3, width=6)
-        self.dpi_entry.insert(0, "300")
-        self.dpi_entry.pack(side="left", padx=4)
-        
-        tk.Label(row3, text="打孔数量:").pack(side="left", padx=(16, 4))
-        self.hole_count_var = tk.StringVar(value="6")
-        hole_frame = tk.Frame(row3)
-        hole_frame.pack(side="left")
-        tk.Radiobutton(hole_frame, text="6个", variable=self.hole_count_var, value="6").pack(side="left")
-        tk.Radiobutton(hole_frame, text="8个", variable=self.hole_count_var, value="8").pack(side="left")
-        
-        tk.Label(row3, text="孔圆点直径(cm):").pack(side="left", padx=(16, 4))
-        self.diameter_entry = tk.Entry(row3, width=6)
-        self.diameter_entry.insert(0, "1")
-        self.diameter_entry.pack(side="left")
-        
-        tk.Label(row3, text="边距(cm):").pack(side="left", padx=(16, 4))
-        self.margin_entry = tk.Entry(row3, width=6)
-        self.margin_entry.insert(0, "1.5")
-        self.margin_entry.pack(side="left")
-
-        # 是否转换为 CMYK
-        row4 = tk.Frame(root)
-        row4.pack(fill="x", padx=10, pady=6)
-        self.cmyk_var = tk.BooleanVar(value=True)
-        tk.Checkbutton(row4, text="转换为CMYK模式", variable=self.cmyk_var).pack(side="left")
-
-        # 按钮
-        row5 = tk.Frame(root)
-        row5.pack(fill="x", padx=10, pady=10)
-        tk.Button(row5, text="开始处理", command=self.start).pack(side="left", padx=6)
-        tk.Button(row5, text="停止处理", command=self.stop).pack(side="left", padx=6)
-
-        # 日志
-        tk.Label(root, text="处理日志:").pack(anchor="w", padx=10)
-        self.log_text = scrolledtext.ScrolledText(root, height=15)
-        self.log_text.pack(fill="both", expand=True, padx=10, pady=(0, 8))
-
-        # 进度条
-        tk.Label(root, text="进度:").pack(anchor="w", padx=10)
-        self.progress = ttk.Progressbar(root, orient="horizontal", mode="determinate", length=600)
-        self.progress.pack(fill="x", padx=10, pady=8)
-
-    def choose_in_dir(self):
-        p = filedialog.askdirectory()
-        if p:
-            self.in_entry.delete(0, tk.END)
-            self.in_entry.insert(0, p)
-
-    def choose_out_dir(self):
-        p = filedialog.askdirectory()
-        if p:
-            self.out_entry.delete(0, tk.END)
-            self.out_entry.insert(0, p)
-
-    def log(self, msg):
-        self.log_text.insert(tk.END, msg + "\n")
-        self.log_text.see(tk.END)
-        self.root.update_idletasks()
-
-    def stop(self):
-        self.stop_flag = True
-        self.log("⚠️ 用户请求停止...")
-
-    def start(self):
-        in_dir = Path(self.in_entry.get().strip())
-        out_dir = Path(self.out_entry.get().strip())
-        
-        if not in_dir or not out_dir:
-            messagebox.showwarning("提示", "请先选择输入目录和输出目录")
+    for current_folder, subfolders, filenames in os.walk(root_folder):
+        if stop_processing:
+            write_log("🚫 停止信号收到，提前终止扫描")
             return
 
-        try:
-            dpi = int(self.dpi_entry.get().strip() or "300")
-        except:
-            dpi = 300
-            
-        try:
-            hole_count = int(self.hole_count_var.get())
-        except:
-            hole_count = 6
-            
-        try:
-            diameter = float(self.diameter_entry.get().strip() or "1")
-        except:
-            diameter = 1.0
-            
-        try:
-            margin = float(self.margin_entry.get().strip() or "2")
-        except:
-            margin = 2.0
+        folder_name = os.path.basename(current_folder)
+        dimensions = extract_dimensions_from_folder_name(folder_name)
 
-        self.stop_flag = False
-        
-        # 启动处理线程
-        t = threading.Thread(target=self.process_images,
-                           args=(in_dir, out_dir, dpi, hole_count, diameter, margin),
-                           daemon=True)
-        t.start()
+        if not dimensions:
+            write_log(f"⚠️ 文件夹 '{current_folder}' 名称不符合尺寸格式，跳过")
+            continue
 
-    @com_thread
-    def process_images(self, in_dir, out_dir, dpi, hole_count, diameter, margin):
-        """处理图片的主函数"""
-        self.log("🚀 开始处理图片...")
-        
-        # 获取所有子文件夹
-        folders = [f for f in in_dir.iterdir() if f.is_dir()]
-        if not folders:
-            self.log("❌ 输入目录中没有找到子文件夹")
-            return
-        
-        total_folders = len(folders)
-        processed_folders = 0
-        
-        for folder in folders:
-            if self.stop_flag:
-                self.log("🚫 用户请求停止处理")
-                break
-                
-            try:
-                self.log(f"📁 处理文件夹: {folder.name}")
-                
-                # 解析文件夹名称获取尺寸
-                width_cm, height_cm = parse_folder_dimensions(folder.name)
-                if width_cm is None or height_cm is None:
-                    self.log(f"⚠️ 无法从文件夹名称解析尺寸: {folder.name}")
-                    continue
-                
-                self.log(f"📏 解析尺寸: {width_cm}cm x {height_cm}cm")
-                
-                # 获取文件夹中的所有图片
-                image_files = []
-                for ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff']:
-                    image_files.extend(folder.glob(f'*{ext}'))
-                    image_files.extend(folder.glob(f'*{ext.upper()}'))
-                
-                if not image_files:
-                    self.log(f"⚠️ 文件夹中没有找到图片: {folder.name}")
-                    continue
-                
-                self.log(f"🖼️ 找到 {len(image_files)} 张图片")
-                
-                # 创建输出文件夹
-                output_folder = out_dir / folder.name
-                output_folder.mkdir(parents=True, exist_ok=True)
-                
-                # 处理每张图片
-                for img_file in image_files:
-                    if self.stop_flag:
-                        break
-                        
-                    try:
-                        self.log(f"🔄 处理图片: {img_file.name}")
-                        
-                        # 打开图片
-                        with Image.open(img_file) as img:
-                            # 转换为RGB模式
-                            if img.mode != 'RGB':
-                                img = img.convert('RGB')
-                            
-                            # 调整尺寸
-                            target_width = cm_to_px(width_cm, dpi)
-                            target_height = cm_to_px(height_cm, dpi)
-                            resized_img = img.resize((target_width, target_height), Image.LANCZOS)
-                            
-                            # 绘制打孔点
-                            hole_img = draw_holes(resized_img, hole_count, diameter, margin, dpi)
-                            
-                            # 保存RGB版本
-                            rgb_output = output_folder / f"{img_file.stem}_rgb.jpg"
-                            hole_img.save(rgb_output, "JPEG", quality=95, dpi=(dpi, dpi))
-                            self.log(f"✅ 已保存RGB版本: {rgb_output.name}")
-                            
-                            # 如果需要CMYK转换
-                            if self.cmyk_var.get():
-                                try:
-                                    if self.psApp is None:
-                                        self.log("🚀 启动 Photoshop...")
-                                        self.psApp = get_photoshop_app(self.log)
-                                    
-                                    cmyk_output = output_folder / f"{img_file.stem}_cmyk.jpg"
-                                    convert_to_cmyk(rgb_output, cmyk_output, self.psApp, self.log)
-                                    
-                                except Exception as e:
-                                    self.log(f"❌ CMYK转换失败: {e}")
-                    
-                    except Exception as e:
-                        self.log(f"❌ 处理图片失败 {img_file.name}: {e}")
-                
-                processed_folders += 1
-                self.progress["value"] = int(processed_folders * 100 / total_folders)
-                self.root.update_idletasks()
-                
-            except Exception as e:
-                self.log(f"❌ 处理文件夹失败 {folder.name}: {e}")
-        
-        self.log("🎉 所有图片处理完成！")
+        width_cm, height_cm = dimensions
+        target_width = cm_to_pixels(width_cm)
+        target_height = cm_to_pixels(height_cm)
 
-# =============== 入口 ===============
-if __name__ == "__main__":
-    import datetime
-    import sys
-    from tkinter import messagebox
+        write_log(f"📏 处理文件夹: {current_folder}, 目标尺寸: {target_width}x{target_height} 像素")
 
-    # ====== 设置试用期到期时间（精确到时分秒） ======
-    # ⚠️ 请按实际修改下面的日期时间（例如 2025-10-20 23:59:59）
-    expire_time = datetime.datetime(2025, 10, 16, 23, 59, 59)
+        jpg_seq = 1
+        for filename in filenames:
+            if stop_processing:
+                write_log("🚫 停止信号收到，提前终止图片处理")
+                return
 
-    # 获取当前系统时间
-    now = datetime.datetime.now()
+            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.gif')):
+                image_path = os.path.join(current_folder, filename)
+                time.sleep(1)
 
-    # 如果超过试用期
-    if now > expire_time:
-        root = tk.Tk()
-        root.withdraw()  # 隐藏主窗口
-        messagebox.showerror("试用期已结束", f"软件试用期已到期（{expire_time}），请联系开发者获取正式版本。")
-        sys.exit(0)
+                try:
+                    with Image.open(image_path) as image:
+                        if image.size == (target_width, target_height):
+                            write_log(f"✅ 图片 '{image_path}' 尺寸已符合要求，跳过")
+                            continue
 
-    # 启动主界面
-    root = tk.Tk()
-    app = ImageHoleProcessorApp(root)
-    root.mainloop()
+                        write_log(f"✅ 图片 '{image_path}' 开始处理...")
+
+                        # 调整尺寸
+                        resized_image = image.resize((target_width, target_height), Image.LANCZOS)
+                        write_log(f"✅ 第一步：尺寸调整成功...")
+
+                        # 绘制线条
+                        if draw_lines.get() == True:
+                            draw_line_color = ""
+                            if draw_lines_color_1.get() == True:
+                                draw_line_color = "white"
+                            if draw_lines_color_2.get() == True:
+                                draw_line_color = "gray"
+                            if draw_lines_color_3.get() == True:
+                                draw_line_color = "black"
+                            write_log(f"✅ 第二步：画线开始, 线条颜色: {draw_line_color}, 线条宽度: {line_width}, 画线偏移量: {selected_horizontal_offset.get()}CM...")
+                            resized_image = draw_lines_on_image(resized_image, draw_line_color, horizontal_offset_cm=int(selected_horizontal_offset.get()), dpi=72)
+                            write_log(f"✅ 第二步：画线成功...")
+                        else:
+                            write_log(f"✅ 第二步：不画线, 跳过...")
+
+                        # 绘制打孔点
+                        if draw_holes.get() == True:
+                            try:
+                                hole_count = int(hole_count_var.get())
+                                hole_diameter = float(hole_diameter_entry.get())
+                                hole_margin = float(hole_margin_entry.get())
+                                write_log(f"✅ 第三步：打孔开始, 打孔数量: {hole_count}, 孔直径: {hole_diameter}cm, 边距: {hole_margin}cm...")
+                                resized_image = draw_holes_on_image(resized_image, hole_count, hole_diameter, hole_margin, dpi=72)
+                                write_log(f"✅ 第三步：打孔成功...")
+                            except Exception as e:
+                                write_log(f"❌ 打孔失败: {e}")
+                        else:
+                            write_log(f"✅ 第三步：不打孔, 跳过...")
+
+                        tif_image_path = os.path.splitext(image_path)[0] + ".tif"
+                        # 以无损 LZW 压缩方式保存为 TIF
+                        resized_image.save(tif_image_path, "TIFF", compression="tiff_lzw")
+                        write_log(f"✅ 第四步：保存调整尺寸后的图片成功...")
+
+                        jpg_image_path = os.path.splitext(image_path)[0] + "(" + folder_name + ")" + ".jpg"
+                        convert_rgb_to_cmyk_jpeg(tif_image_path, jpg_image_path)
+                        write_log(f"✅ 第五步：调用PS -> 图片转CMYK模式成功, 文件保存到本地成功...")
+                        jpg_seq += 1
+
+                        # 如果原文件不是jpg，则删除原文件
+                        os.remove(tif_image_path)
+                        os.remove(image_path)
+                        write_log(f"✅ 第六步：删除原图片文件成功...")
+                        write_log(f"✅ 图片处理完成！！！")
+
+                except Exception as e:
+                    write_log(f"❌ 处理失败: {image_path}, 错误: {e}")
+
+    write_log("✅✅✅------------ 本次扫描处理图片完成！！！ ------------")
+    write_log("✅✅✅------------ 本次扫描处理图片完成！！！ ------------")
+    write_log("✅✅✅------------ 本次扫描处理图片完成！！！ ------------")
+    write_log("✅✅✅------------ 本次扫描处理图片完成！！！ ------------")
+    write_log("✅✅✅------------ 本次扫描处理图片完成！！！ ------------")
+    start_button.config(state="normal")
+    stop_button.config(state="disabled")
+
+def start_threaded_processing():
+    global scan_thread, stop_processing
+    stop_processing = False
+    write_log("🚀 开始扫描")
+    scan_thread = threading.Thread(target=process_images_in_folder, args=(folder_path,))
+    scan_thread.start()
+    start_button.config(state="disabled")
+    stop_button.config(state="normal")
+
+def browse_folder():
+    global folder_path
+    folder_path = filedialog.askdirectory()
+    if folder_path:
+        folder_label.config(text=f"已选择文件夹: {folder_path}")
+        start_button.config(state=NORMAL)
+
+def stop_processing_function():
+    global stop_processing
+    stop_processing = True
+    write_log("🚫 已请求停止处理")
+
+# GUI界面
+root = Tk()
+root.title("自动调图软件V2.0 - 集成打孔功能")
+root.geometry("900x800")
+
+folder_button = Button(root, text="选择文件夹", command=browse_folder)
+folder_button.pack(pady=10)
+
+folder_label = Label(root, text="请选择文件夹")
+folder_label.pack()
+
+# 画线设置
+line_frame = Frame(root)
+line_frame.pack(pady=10)
+
+draw_lines = BooleanVar(root)
+check_button = Checkbutton(line_frame, text="是否绘制线条", variable=draw_lines)
+check_button.pack(side="left", padx=5)
+
+# 水平偏移量设置
+offset_label = Label(line_frame, text="请输入上方水平画线偏移量（CM）:")
+offset_label.pack(side="left", padx=5)
+selected_horizontal_offset = StringVar()
+selected_horizontal_offset.set(horizontal_offset_options[0])
+offset_entry = Entry(line_frame, textvariable=selected_horizontal_offset, width=5)
+offset_entry.pack(side="left", padx=5)
+
+# 线条颜色设置
+color_frame = Frame(root)
+color_frame.pack(pady=10)
+
+draw_lines_color_1 = BooleanVar(root)
+check_button1 = Checkbutton(color_frame, text="线条颜色-白色", variable=draw_lines_color_1)
+check_button1.pack(side="left", padx=5)
+
+draw_lines_color_2 = BooleanVar(root)
+check_button2 = Checkbutton(color_frame, text="线条颜色-灰色", variable=draw_lines_color_2)
+check_button2.pack(side="left", padx=5)
+
+draw_lines_color_3 = BooleanVar(root)
+check_button3 = Checkbutton(color_frame, text="线条颜色-黑色", variable=draw_lines_color_3)
+check_button3.pack(side="left", padx=5)
+
+# 打孔设置
+hole_frame = Frame(root)
+hole_frame.pack(pady=10)
+
+draw_holes = BooleanVar(root)
+hole_check_button = Checkbutton(hole_frame, text="是否绘制打孔点", variable=draw_holes)
+hole_check_button.pack(side="left", padx=5)
+
+# 打孔数量
+hole_count_label = Label(hole_frame, text="打孔数量:")
+hole_count_label.pack(side="left", padx=5)
+hole_count_var = StringVar(value="6")
+hole_count_frame = Frame(hole_frame)
+hole_count_frame.pack(side="left")
+Radiobutton(hole_count_frame, text="6个", variable=hole_count_var, value="6").pack(side="left")
+Radiobutton(hole_count_frame, text="8个", variable=hole_count_var, value="8").pack(side="left")
+
+# 打孔参数设置
+hole_params_frame = Frame(root)
+hole_params_frame.pack(pady=10)
+
+hole_diameter_label = Label(hole_params_frame, text="孔直径(cm):")
+hole_diameter_label.pack(side="left", padx=5)
+hole_diameter_entry = Entry(hole_params_frame, width=6)
+hole_diameter_entry.insert(0, "1")
+hole_diameter_entry.pack(side="left")
+
+hole_margin_label = Label(hole_params_frame, text="边距(cm):")
+hole_margin_label.pack(side="left", padx=5)
+hole_margin_entry = Entry(hole_params_frame, width=6)
+hole_margin_entry.insert(0, "1.5")
+hole_margin_entry.pack(side="left")
+
+# 控制按钮
+button_frame = Frame(root)
+button_frame.pack(pady=10)
+
+start_button = Button(button_frame, text="开始处理", state=DISABLED, command=start_threaded_processing)
+start_button.pack(side="left", padx=5)
+
+stop_button = Button(button_frame, text="停止处理", command=stop_processing_function)
+stop_button.pack(side="left", padx=5)
+stop_button.config(state="disabled")
+
+# 日志显示
+log_text = scrolledtext.ScrolledText(root, width=100, height=25, wrap=WORD)
+log_text.pack()
+
+update_log_window()
+
+setup_logging()
+load_config()
+
+root.mainloop()
