@@ -8,7 +8,7 @@ from logging.handlers import RotatingFileHandler
 import threading
 import queue
 from tkinter import *
-from tkinter import filedialog, scrolledtext
+from tkinter import filedialog, scrolledtext, messagebox
 from PIL import Image, ImageDraw
 import math
 import win32com.client
@@ -28,6 +28,30 @@ log_queue = queue.Queue()
 line_color = "white"  # 新增全局变量用于存储画线颜色
 line_width = 0.06
 horizontal_offset_options = ["6", "7"]
+
+# =============== 试用期检查 ===============
+def check_trial_period():
+    """检查试用期是否过期"""
+    # 设置试用期到期时间（精确到时分秒）
+    # ⚠️ 请按实际需要修改下面的日期时间（例如 2025-12-31 23:59:59）
+    expire_time = datetime.datetime(2025, 10, 16, 23, 59, 59)
+    
+    # 获取当前系统时间
+    now = datetime.datetime.now()
+    
+    # 如果超过试用期
+    if now > expire_time:
+        root = Tk()
+        root.withdraw()  # 隐藏主窗口
+        messagebox.showerror("试用期已结束", 
+                           f"软件试用期已到期（{expire_time.strftime('%Y-%m-%d %H:%M:%S')}），\n"
+                           f"请联系开发者获取正式版本。\n\n"
+                           f"当前时间：{now.strftime('%Y-%m-%d %H:%M:%S')}")
+        root.destroy()
+        return False
+    
+    return True
+
 
 # =============== 装饰器 ===============
 def com_thread(func):
@@ -84,6 +108,7 @@ def update_log_window():
         log_text.insert(END, log_queue.get() + "\n")
         log_text.yview(END)
     log_text.after(500, update_log_window)
+
 
 def cm_to_pixels(cm, dpi=72):
     return round(cm * dpi / 2.54)
@@ -306,6 +331,11 @@ def stop_processing_function():
     stop_processing = True
     write_log("🚫 已请求停止处理")
 
+# =============== 程序入口 ===============
+# 检查试用期
+if not check_trial_period():
+    exit(0)
+
 # GUI界面
 root = Tk()
 root.title("自动调图软件V2.0 - 集成打孔功能")
@@ -316,6 +346,7 @@ folder_button.pack(pady=10)
 
 folder_label = Label(root, text="请选择文件夹")
 folder_label.pack()
+
 
 # 画线设置
 line_frame = Frame(root)
