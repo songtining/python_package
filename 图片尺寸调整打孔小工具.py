@@ -34,7 +34,7 @@ def check_trial_period():
     """检查试用期是否过期"""
     # 设置试用期到期时间（精确到时分秒）
     # ⚠️ 请按实际需要修改下面的日期时间（例如 2025-12-31 23:59:59）
-    expire_time = datetime.datetime(2025, 10, 19, 23, 59, 59)
+    expire_time = datetime.datetime(2025, 10, 30, 23, 59, 59)
     
     # 获取当前系统时间
     now = datetime.datetime.now()
@@ -244,10 +244,6 @@ def process_images_in_folder(root_folder):
 
                 try:
                     with Image.open(image_path) as image:
-                        if image.size == (target_width, target_height):
-                            write_log(f"✅ 图片 '{image_path}' 尺寸已符合要求，跳过")
-                            continue
-
                         write_log(f"✅ 图片 '{image_path}' 开始处理...")
 
                         # 调整尺寸
