@@ -334,7 +334,7 @@ if not check_trial_period():
 
 # GUI界面
 root = Tk()
-root.title("自动调图软件V2.0_试用版_20251017")
+root.title("自动调图软件V2.0_试用版_20251028")
 root.geometry("900x800")
 
 folder_button = Button(root, text="选择文件夹", command=browse_folder)
