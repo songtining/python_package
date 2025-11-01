@@ -34,7 +34,7 @@ def check_trial_period():
     """检查试用期是否过期"""
     # 设置试用期到期时间（精确到时分秒）
     # ⚠️ 请按实际需要修改下面的日期时间（例如 2025-12-31 23:59:59）
-    expire_time = datetime.datetime(2025, 10, 30, 23, 59, 59)
+    expire_time = datetime.datetime(2025, 11, 4, 23, 59, 59)
     
     # 获取当前系统时间
     now = datetime.datetime.now()
@@ -334,7 +334,7 @@ if not check_trial_period():
 
 # GUI界面
 root = Tk()
-root.title("自动调图软件V2.0_试用版_20251028")
+root.title("自动调图软件V2.0_试用版_20251101")
 root.geometry("900x800")
 
 folder_button = Button(root, text="选择文件夹", command=browse_folder)
