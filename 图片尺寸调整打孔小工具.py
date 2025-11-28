@@ -309,8 +309,8 @@ def process_images_in_folder(root_folder):
                         jpg_seq += 1
 
                         # 如果原文件不是jpg，则删除原文件
-                        os.remove(tif_image_path)
-                        os.remove(image_path)
+                        # os.remove(tif_image_path)
+                        # os.remove(image_path)
                         write_log(f"✅ 第六步：删除原图片文件成功...")
                         write_log(f"✅ 图片处理完成！！！")
 
