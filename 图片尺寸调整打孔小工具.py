@@ -36,7 +36,7 @@ def check_trial_period():
     """检查试用期是否过期"""
     # 设置试用期到期时间（精确到时分秒）
     # ⚠️ 请按实际需要修改下面的日期时间（例如 2025-12-31 23:59:59）
-    expire_time = datetime.datetime(2025, 12, 31, 23, 59, 59)
+    expire_time = datetime.datetime(2099, 12, 31, 23, 59, 59)
 
     # 获取当前系统时间
     now = datetime.datetime.now()
@@ -180,6 +180,10 @@ def draw_lines_on_image(image, draw_line_color, horizontal_offset_cm=7, dpi=72):
 
 def draw_holes_on_image(image, hole_count=6, hole_diameter_cm=1, margin_cm=2, dpi=72):
     """在图片上绘制打孔点，保证左右上下对称、间距均匀"""
+    # 确保图片是RGB模式，避免颜色模式问题导致红色变黑色
+    if image.mode != 'RGB':
+        image = image.convert('RGB')
+    
     draw = ImageDraw.Draw(image)
     width_px, height_px = image.size
     width_cm = width_px * 2.54 / dpi
@@ -206,12 +210,14 @@ def draw_holes_on_image(image, hole_count=6, hole_diameter_cm=1, margin_cm=2, dp
     top_y_px = cm_to_pixels(height_cm - margin_cm - hole_radius_cm, dpi)
     bottom_y_px = cm_to_pixels(margin_cm + hole_radius_cm, dpi)
 
+    # 使用RGB元组(255, 0, 0)代替字符串'red'，确保在所有模式下都能正确显示红色
+    red_color = (255, 0, 0)
     # 绘制红色圆点（顶部+底部）
     for y in [top_y_px, bottom_y_px]:
         for x in x_positions_px:
             draw.ellipse(
                 [x - hole_radius_px, y - hole_radius_px, x + hole_radius_px, y + hole_radius_px],
-                fill='red', outline='red'
+                fill=red_color, outline=red_color
             )
 
     return image
@@ -304,13 +310,13 @@ def process_images_in_folder(root_folder):
                         write_log(f"✅ 第四步：保存调整尺寸后的图片成功...")
 
                         jpg_image_path = os.path.splitext(image_path)[0] + "(" + folder_name + ")" + ".jpg"
-                        # convert_rgb_to_cmyk_jpeg(tif_image_path, jpg_image_path)
+                        convert_rgb_to_cmyk_jpeg(tif_image_path, jpg_image_path)
                         write_log(f"✅ 第五步：调用PS -> 图片转CMYK模式成功, 文件保存到本地成功...")
                         jpg_seq += 1
 
                         # 如果原文件不是jpg，则删除原文件
-                        # os.remove(tif_image_path)
-                        # os.remove(image_path)
+                        os.remove(tif_image_path)
+                        os.remove(image_path)
                         write_log(f"✅ 第六步：删除原图片文件成功...")
                         write_log(f"✅ 图片处理完成！！！")
 
@@ -357,8 +363,8 @@ if not check_trial_period():
 
 # GUI界面
 root = Tk()
-root.title("自动调图软件V2.0_试用版_20251101")
-root.geometry("900x800")
+root.title("自动调图软件V2.0_图片打孔_20251128")
+root.geometry("900x700")
 
 folder_button = Button(root, text="选择文件夹", command=browse_folder)
 folder_button.pack(pady=10)
