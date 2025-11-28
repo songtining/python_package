@@ -14,6 +14,7 @@ import math
 import win32com.client
 import pythoncom
 import functools
+
 Image.MAX_IMAGE_PIXELS = 1000000000  # 设置为10亿像素，适应大图
 
 # 全局变量
@@ -29,33 +30,35 @@ line_color = "white"  # 新增全局变量用于存储画线颜色
 line_width = 0.06
 horizontal_offset_options = ["6", "7"]
 
+
 # =============== 试用期检查 ===============
 def check_trial_period():
     """检查试用期是否过期"""
     # 设置试用期到期时间（精确到时分秒）
     # ⚠️ 请按实际需要修改下面的日期时间（例如 2025-12-31 23:59:59）
-    expire_time = datetime.datetime(2025, 11, 4, 23, 59, 59)
-    
+    expire_time = datetime.datetime(2025, 12, 31, 23, 59, 59)
+
     # 获取当前系统时间
     now = datetime.datetime.now()
-    
+
     # 如果超过试用期
     if now > expire_time:
         root = Tk()
         root.withdraw()  # 隐藏主窗口
-        messagebox.showerror("试用期已结束", 
-                           f"软件试用期已到期（{expire_time.strftime('%Y-%m-%d %H:%M:%S')}），\n"
-                           f"请联系开发者获取正式版本。\n\n"
-                           f"当前时间：{now.strftime('%Y-%m-%d %H:%M:%S')}")
+        messagebox.showerror("试用期已结束",
+                             f"软件试用期已到期（{expire_time.strftime('%Y-%m-%d %H:%M:%S')}），\n"
+                             f"请联系开发者获取正式版本。\n\n"
+                             f"当前时间：{now.strftime('%Y-%m-%d %H:%M:%S')}")
         root.destroy()
         return False
-    
+
     return True
 
 
 # =============== 装饰器 ===============
 def com_thread(func):
     """保证线程内自动初始化/释放 COM"""
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         pythoncom.CoInitialize()
@@ -63,7 +66,9 @@ def com_thread(func):
             return func(*args, **kwargs)
         finally:
             pythoncom.CoUninitialize()
+
     return wrapper
+
 
 # 设置日志
 def setup_logging():
@@ -72,6 +77,7 @@ def setup_logging():
     handler = RotatingFileHandler(f"logs/{LOG_FILE}", maxBytes=MAX_LOG_FILE_SIZE, backupCount=5)
     handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
     logging.basicConfig(level=logging.INFO, handlers=[handler])
+
 
 def load_config():
     """ 读取配置文件，获取默认文件夹路径和画线颜色 """
@@ -97,11 +103,13 @@ def load_config():
     else:
         write_log("⚠️ 配置文件不存在，请重新配置或手动选择文件夹")
 
+
 def write_log(message):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_message = f"[{timestamp}] {message}"
     log_queue.put(log_message)
     logging.info(log_message)
+
 
 def update_log_window():
     while not log_queue.empty():
@@ -112,6 +120,7 @@ def update_log_window():
 
 def cm_to_pixels(cm, dpi=72):
     return round(cm * dpi / 2.54)
+
 
 def extract_dimensions_from_folder_name(folder_name):
     match = re.search(r'(\d+(\.\d+)?)[xX](\d+(\.\d+)?)(CM|cm)?', folder_name)
@@ -149,6 +158,7 @@ def convert_rgb_to_cmyk_jpeg(input_tif, output_jpg):
     # 关闭文档
     doc.Close()
 
+
 def draw_lines_on_image(image, draw_line_color, horizontal_offset_cm=7, dpi=72):
     """ 在图片上方指定厘米处绘制水平线，并在中央绘制垂直线 """
     draw = ImageDraw.Draw(image)
@@ -157,14 +167,16 @@ def draw_lines_on_image(image, draw_line_color, horizontal_offset_cm=7, dpi=72):
     y_horizontal = min(horizontal_offset_px, height - 1)
     x_vertical = width // 2
     line_width_px = mm_to_pixels(line_width, dpi)
-    line_width_px = math.ceil(line_width_px) if line_width_px - math.floor(line_width_px) >= 0.5 else math.floor(line_width_px)
-    
+    line_width_px = math.ceil(line_width_px) if line_width_px - math.floor(line_width_px) >= 0.5 else math.floor(
+        line_width_px)
+
     # 画水平线 (从 (0, y) 到 (width, y))
     draw.line([(0, y_horizontal), (width, y_horizontal)], fill=draw_line_color, width=line_width_px)
     # 画垂直线 (从 (x, 0) 到 (x, height))
     draw.line([(x_vertical, 0), (x_vertical, height)], fill=draw_line_color, width=line_width_px)
-    
+
     return image
+
 
 def draw_holes_on_image(image, hole_count=6, hole_diameter_cm=1, margin_cm=2, dpi=72):
     """在图片上绘制打孔点，保证左右上下对称、间距均匀"""
@@ -204,9 +216,11 @@ def draw_holes_on_image(image, hole_count=6, hole_diameter_cm=1, margin_cm=2, dp
 
     return image
 
+
 def mm_to_pixels(mm_value, dpi):
     """将毫米转换为像素"""
     return mm_value * (dpi / 25.4)
+
 
 @com_thread
 def process_images_in_folder(root_folder):
@@ -259,8 +273,11 @@ def process_images_in_folder(root_folder):
                                 draw_line_color = "gray"
                             if draw_lines_color_3.get() == True:
                                 draw_line_color = "black"
-                            write_log(f"✅ 第二步：画线开始, 线条颜色: {draw_line_color}, 线条宽度: {line_width}, 画线偏移量: {selected_horizontal_offset.get()}CM...")
-                            resized_image = draw_lines_on_image(resized_image, draw_line_color, horizontal_offset_cm=int(selected_horizontal_offset.get()), dpi=72)
+                            write_log(
+                                f"✅ 第二步：画线开始, 线条颜色: {draw_line_color}, 线条宽度: {line_width}, 画线偏移量: {selected_horizontal_offset.get()}CM...")
+                            resized_image = draw_lines_on_image(resized_image, draw_line_color,
+                                                                horizontal_offset_cm=int(
+                                                                    selected_horizontal_offset.get()), dpi=72)
                             write_log(f"✅ 第二步：画线成功...")
                         else:
                             write_log(f"✅ 第二步：不画线, 跳过...")
@@ -271,8 +288,10 @@ def process_images_in_folder(root_folder):
                                 hole_count = int(hole_count_var.get())
                                 hole_diameter = float(hole_diameter_entry.get())
                                 hole_margin = float(hole_margin_entry.get())
-                                write_log(f"✅ 第三步：打孔开始, 打孔数量: {hole_count}, 孔直径: {hole_diameter}cm, 边距: {hole_margin}cm...")
-                                resized_image = draw_holes_on_image(resized_image, hole_count, hole_diameter, hole_margin, dpi=72)
+                                write_log(
+                                    f"✅ 第三步：打孔开始, 打孔数量: {hole_count}, 孔直径: {hole_diameter}cm, 边距: {hole_margin}cm...")
+                                resized_image = draw_holes_on_image(resized_image, hole_count, hole_diameter,
+                                                                    hole_margin, dpi=72)
                                 write_log(f"✅ 第三步：打孔成功...")
                             except Exception as e:
                                 write_log(f"❌ 打孔失败: {e}")
@@ -285,7 +304,7 @@ def process_images_in_folder(root_folder):
                         write_log(f"✅ 第四步：保存调整尺寸后的图片成功...")
 
                         jpg_image_path = os.path.splitext(image_path)[0] + "(" + folder_name + ")" + ".jpg"
-                        convert_rgb_to_cmyk_jpeg(tif_image_path, jpg_image_path)
+                        # convert_rgb_to_cmyk_jpeg(tif_image_path, jpg_image_path)
                         write_log(f"✅ 第五步：调用PS -> 图片转CMYK模式成功, 文件保存到本地成功...")
                         jpg_seq += 1
 
@@ -306,6 +325,7 @@ def process_images_in_folder(root_folder):
     start_button.config(state="normal")
     stop_button.config(state="disabled")
 
+
 def start_threaded_processing():
     global scan_thread, stop_processing
     stop_processing = False
@@ -315,6 +335,7 @@ def start_threaded_processing():
     start_button.config(state="disabled")
     stop_button.config(state="normal")
 
+
 def browse_folder():
     global folder_path
     folder_path = filedialog.askdirectory()
@@ -322,10 +343,12 @@ def browse_folder():
         folder_label.config(text=f"已选择文件夹: {folder_path}")
         start_button.config(state=NORMAL)
 
+
 def stop_processing_function():
     global stop_processing
     stop_processing = True
     write_log("🚫 已请求停止处理")
+
 
 # =============== 程序入口 ===============
 # 检查试用期
@@ -342,7 +365,6 @@ folder_button.pack(pady=10)
 
 folder_label = Label(root, text="请选择文件夹")
 folder_label.pack()
-
 
 # 画线设置
 line_frame = Frame(root)
