@@ -178,6 +178,29 @@ def draw_lines_on_image(image, draw_line_color, horizontal_offset_cm=7, dpi=72):
     return image
 
 
+def add_white_border(image, border_width_cm, dpi=72):
+    """在图片四周添加白边"""
+    # 确保图片是RGB模式
+    if image.mode != 'RGB':
+        image = image.convert('RGB')
+    
+    # 将白边宽度从cm转换为像素
+    border_width_px = cm_to_pixels(border_width_cm, dpi)
+    
+    # 计算新图片的尺寸（原尺寸 + 上下左右各加白边）
+    width, height = image.size
+    new_width = width + border_width_px * 2
+    new_height = height + border_width_px * 2
+    
+    # 创建新的白色背景图片
+    white_bg = Image.new('RGB', (new_width, new_height), (255, 255, 255))
+    
+    # 将原图片粘贴到白色背景的中心位置
+    white_bg.paste(image, (border_width_px, border_width_px))
+    
+    return white_bg
+
+
 def draw_holes_on_image(image, hole_count=6, hole_diameter_cm=1, margin_cm=2, dpi=72):
     """在图片上绘制打孔点，保证左右上下对称、间距均匀"""
     # 确保图片是RGB模式，避免颜色模式问题导致红色变黑色
@@ -304,20 +327,35 @@ def process_images_in_folder(root_folder):
                         else:
                             write_log(f"✅ 第三步：不打孔, 跳过...")
 
+                        # 添加白边
+                        if add_border.get() == True:
+                            try:
+                                border_width = float(border_width_entry.get())
+                                if border_width > 0:
+                                    write_log(f"✅ 第四步：添加白边开始, 白边宽度: {border_width}cm...")
+                                    resized_image = add_white_border(resized_image, border_width, dpi=72)
+                                    write_log(f"✅ 第四步：添加白边成功...")
+                                else:
+                                    write_log(f"⚠️ 白边宽度必须大于0，跳过添加白边...")
+                            except Exception as e:
+                                write_log(f"❌ 添加白边失败: {e}")
+                        else:
+                            write_log(f"✅ 第四步：不添加白边, 跳过...")
+
                         tif_image_path = os.path.splitext(image_path)[0] + ".tif"
                         # 以无损 LZW 压缩方式保存为 TIF
                         resized_image.save(tif_image_path, "TIFF", compression="tiff_lzw")
-                        write_log(f"✅ 第四步：保存调整尺寸后的图片成功...")
+                        write_log(f"✅ 第五步：保存调整尺寸后的图片成功...")
 
-                        jpg_image_path = os.path.splitext(image_path)[0] + "(" + folder_name + ")" + ".jpg"
-                        convert_rgb_to_cmyk_jpeg(tif_image_path, jpg_image_path)
-                        write_log(f"✅ 第五步：调用PS -> 图片转CMYK模式成功, 文件保存到本地成功...")
+                        # jpg_image_path = os.path.splitext(image_path)[0] + "(" + folder_name + ")" + ".jpg"
+                        # convert_rgb_to_cmyk_jpeg(tif_image_path, jpg_image_path)
+                        write_log(f"✅ 第六步：调用PS -> 图片转CMYK模式成功, 文件保存到本地成功...")
                         jpg_seq += 1
 
                         # 如果原文件不是jpg，则删除原文件
-                        os.remove(tif_image_path)
-                        os.remove(image_path)
-                        write_log(f"✅ 第六步：删除原图片文件成功...")
+                        # os.remove(tif_image_path)
+                        # os.remove(image_path)
+                        write_log(f"✅ 第七步：删除原图片文件成功...")
                         write_log(f"✅ 图片处理完成！！！")
 
                 except Exception as e:
@@ -403,6 +441,20 @@ check_button2.pack(side="left", padx=5)
 draw_lines_color_3 = BooleanVar(root)
 check_button3 = Checkbutton(color_frame, text="线条颜色-黑色", variable=draw_lines_color_3)
 check_button3.pack(side="left", padx=5)
+
+# 白边设置
+border_frame = Frame(root)
+border_frame.pack(pady=10)
+
+add_border = BooleanVar(root)
+border_check_button = Checkbutton(border_frame, text="是否添加白边", variable=add_border)
+border_check_button.pack(side="left", padx=5)
+
+border_width_label = Label(border_frame, text="白边宽度(cm):")
+border_width_label.pack(side="left", padx=5)
+border_width_entry = Entry(border_frame, width=6)
+border_width_entry.insert(0, "0.5")
+border_width_entry.pack(side="left")
 
 # 打孔设置
 hole_frame = Frame(root)
