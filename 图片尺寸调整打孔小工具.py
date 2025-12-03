@@ -348,13 +348,13 @@ def process_images_in_folder(root_folder):
                         write_log(f"✅ 第五步：保存调整尺寸后的图片成功...")
 
                         # jpg_image_path = os.path.splitext(image_path)[0] + "(" + folder_name + ")" + ".jpg"
-                        # convert_rgb_to_cmyk_jpeg(tif_image_path, jpg_image_path)
+                        convert_rgb_to_cmyk_jpeg(tif_image_path, jpg_image_path)
                         write_log(f"✅ 第六步：调用PS -> 图片转CMYK模式成功, 文件保存到本地成功...")
                         jpg_seq += 1
 
                         # 如果原文件不是jpg，则删除原文件
-                        # os.remove(tif_image_path)
-                        # os.remove(image_path)
+                        os.remove(tif_image_path)
+                        os.remove(image_path)
                         write_log(f"✅ 第七步：删除原图片文件成功...")
                         write_log(f"✅ 图片处理完成！！！")
 
