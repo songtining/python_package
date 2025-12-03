@@ -401,7 +401,7 @@ if not check_trial_period():
 
 # GUI界面
 root = Tk()
-root.title("自动调图软件V2.0_图片打孔_20251128")
+root.title("自动调图软件V2.0_图片打孔_加白边_20251203")
 root.geometry("900x700")
 
 folder_button = Button(root, text="选择文件夹", command=browse_folder)
