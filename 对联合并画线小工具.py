@@ -106,32 +106,38 @@ def get_image_dpi(img: Image.Image, default_dpi=300):
 def cm_to_px(cm: float, dpi: float) -> int:
     return int(round(cm * dpi / 2.54))
 
-def draw_guides(img: Image.Image, top_cm=2.5, line_width=3,
-                color=(255, 255, 255), default_dpi=300):
+def draw_guides(
+    img: Image.Image,
+    top_cm=2.5,
+    line_width=3,
+    color=(255, 0, 0),  # 建议先用红色确认
+    default_dpi=300
+):
     img = img.copy()
     draw = ImageDraw.Draw(img)
 
+    # ===== 横线（cm → px）=====
     dpi_x, dpi_y = get_image_dpi(img, default_dpi)
-
-    # 横线：距离顶部 top_cm
     y = int(cm_to_px(top_cm, dpi_y))
     y = max(0, min(img.height - 1, y))
     draw.line([(0, y), (img.width, y)], fill=color, width=line_width)
 
-    # 竖线：只画上下 1/10
-    x = img.width // 2
-    segment_height = img.height // 10
+    # ===== 竖线（上下 2/10）=====
+    x = max(0, min(img.width - 1, img.width // 2))
 
-    # 上段
+    # 上下各 2/10
+    segment_height = max(1, img.height * 2 // 10)
+
+    # 上部 2/10
     draw.line(
         [(x, 0), (x, segment_height)],
         fill=color,
         width=line_width
     )
 
-    # 下段
+    # 下部 2/10
     draw.line(
-        [(x, img.height - segment_height), (x, img.height)],
+        [(x, img.height - segment_height), (x, img.height - 1)],
         fill=color,
         width=line_width
     )
