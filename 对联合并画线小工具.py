@@ -118,29 +118,22 @@ def draw_guides(
 
     # ===== 横线（cm → px）=====
     dpi_x, dpi_y = get_image_dpi(img, default_dpi)
-    y = int(cm_to_px(top_cm, dpi_y))
+    y = cm_to_px(top_cm, dpi_y)
     y = max(0, min(img.height - 1, y))
     draw.line([(0, y), (img.width, y)], fill=color, width=line_width)
 
-    # ===== 竖线（上下 2/10）=====
-    x = max(0, min(img.width - 1, img.width // 2))
+    # ===== 竖线（上下各 2/10）=====
+    x = img.width // 2
 
-    # 上下各 2/10
-    segment_height = max(1, img.height * 2 // 10)
+    # 计算上下各十分之二的高度
+    segment_height = img.height * 2 // 10
+    segment_height = max(1, segment_height)  # 确保至少为1像素
 
-    # 上部 2/10
-    draw.line(
-        [(x, 0), (x, segment_height)],
-        fill=color,
-        width=line_width
-    )
+    # 上部 2/10：从顶部开始画
+    draw.line([(x, 0), (x, segment_height)], fill=color, width=line_width)
 
-    # 下部 2/10
-    draw.line(
-        [(x, img.height - segment_height), (x, img.height - 1)],
-        fill=color,
-        width=line_width
-    )
+    # 下部 2/10：从底部向上画
+    draw.line([(x, img.height - segment_height), (x, img.height)], fill=color, width=line_width)
 
     return img
 
