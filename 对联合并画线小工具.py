@@ -108,13 +108,34 @@ def cm_to_px(cm: float, dpi: float) -> int:
 
 def draw_guides(img: Image.Image, top_cm=2.5, line_width=3,
                 color=(255, 255, 255), default_dpi=300):
+    img = img.copy()
     draw = ImageDraw.Draw(img)
+
     dpi_x, dpi_y = get_image_dpi(img, default_dpi)
-    y = cm_to_px(top_cm, dpi_y)
+
+    # 横线：距离顶部 top_cm
+    y = int(cm_to_px(top_cm, dpi_y))
     y = max(0, min(img.height - 1, y))
-    x = img.width // 2
     draw.line([(0, y), (img.width, y)], fill=color, width=line_width)
-    draw.line([(x, 0), (x, img.height)], fill=color, width=line_width)
+
+    # 竖线：只画上下 1/10
+    x = img.width // 2
+    segment_height = img.height // 10
+
+    # 上段
+    draw.line(
+        [(x, 0), (x, segment_height)],
+        fill=color,
+        width=line_width
+    )
+
+    # 下段
+    draw.line(
+        [(x, img.height - segment_height), (x, img.height)],
+        fill=color,
+        width=line_width
+    )
+
     return img
 
 def format_cm(value: float) -> str:
@@ -238,7 +259,7 @@ def get_photoshop_app(log_func=print):
 class CoupletProcessorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("自动调图软件（图片合并 & CMYK模式转换）V3.1")
+        self.root.title("自动调图软件（图片合并 & CMYK模式转换）V26.01.18")
         self.root.geometry("1100x750")
 
         self.stop_flag = False
