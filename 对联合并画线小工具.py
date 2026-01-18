@@ -106,39 +106,33 @@ def get_image_dpi(img: Image.Image, default_dpi=300):
 def cm_to_px(cm: float, dpi: float) -> int:
     return int(round(cm * dpi / 2.54))
 
+
 def draw_guides(img: Image.Image, top_cm=2.5, line_width=3,
-                color=(255, 255, 255), default_dpi=300, log_func=print):
+                color=(255, 255, 255), default_dpi=300):
     draw = ImageDraw.Draw(img)
     dpi_x, dpi_y = get_image_dpi(img, default_dpi)
-    
+
     # 绘制横线
     y = cm_to_px(top_cm, dpi_y)
     y = max(0, min(img.height - 1, y))
-    # log_func(f"📏 横线坐标: y={y}px (top_cm={top_cm}cm, dpi_y={dpi_y})")
     draw.line([(0, y), (img.width, y)], fill=color, width=line_width)
 
-    # 绘制竖线（上下各十分之二）
+    # 绘制竖线（上下各二十分之一）← 修改这里：1/10 改为 1/20
     x = img.width // 2
-    
-    # 计算上下各十分之二的高度
-    segment_height = img.height * 2 // 10
-    segment_height = max(1, segment_height)  # 确保至少为1像素
-    
-    # log_func(f"📏 图片尺寸: {img.width}x{img.height}px, DPI: ({dpi_x}, {dpi_y})")
-    # log_func(f"📏 竖线坐标: x={x}px (图片宽度中心)")
-    # log_func(f"📏 竖线段高度: {segment_height}px (图片高度的2/10)")
-    
-    # 上部 2/10：从顶部开始画
+
+    # 计算上下各二十分之一的高度
+    segment_height = img.height * 1 // 25  # 从 // 10 改为 // 20
+    segment_height = max(200, segment_height)  # 确保至少为1像素
+
+    # 上部 1/20：从顶部开始画
     top_end = segment_height
-    # log_func(f"📏 上部竖线: 从 (x={x}, y=0) 到 (x={x}, y={top_end})")
     draw.line([(x, 0), (x, top_end)], fill=color, width=line_width)
 
-    # 下部 2/10：从底部向上画
+    # 下部 1/20：从底部向上画
     bottom_start = img.height - segment_height
     bottom_end = img.height
-    # log_func(f"📏 下部竖线: 从 (x={x}, y={bottom_start}) 到 (x={x}, y={bottom_end})")
     draw.line([(x, bottom_start), (x, bottom_end)], fill=color, width=line_width)
-    
+
     return img
 
 def format_cm(value: float) -> str:
