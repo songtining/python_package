@@ -114,7 +114,7 @@ def draw_guides(img: Image.Image, top_cm=2.5, line_width=3,
     # 绘制横线
     y = cm_to_px(top_cm, dpi_y)
     y = max(0, min(img.height - 1, y))
-    log_func(f"📏 横线坐标: y={y}px (top_cm={top_cm}cm, dpi_y={dpi_y})")
+    # log_func(f"📏 横线坐标: y={y}px (top_cm={top_cm}cm, dpi_y={dpi_y})")
     draw.line([(0, y), (img.width, y)], fill=color, width=line_width)
 
     # 绘制竖线（上下各十分之二）
@@ -124,19 +124,19 @@ def draw_guides(img: Image.Image, top_cm=2.5, line_width=3,
     segment_height = img.height * 2 // 10
     segment_height = max(1, segment_height)  # 确保至少为1像素
     
-    log_func(f"📏 图片尺寸: {img.width}x{img.height}px, DPI: ({dpi_x}, {dpi_y})")
-    log_func(f"📏 竖线坐标: x={x}px (图片宽度中心)")
-    log_func(f"📏 竖线段高度: {segment_height}px (图片高度的2/10)")
+    # log_func(f"📏 图片尺寸: {img.width}x{img.height}px, DPI: ({dpi_x}, {dpi_y})")
+    # log_func(f"📏 竖线坐标: x={x}px (图片宽度中心)")
+    # log_func(f"📏 竖线段高度: {segment_height}px (图片高度的2/10)")
     
     # 上部 2/10：从顶部开始画
     top_end = segment_height
-    log_func(f"📏 上部竖线: 从 (x={x}, y=0) 到 (x={x}, y={top_end})")
+    # log_func(f"📏 上部竖线: 从 (x={x}, y=0) 到 (x={x}, y={top_end})")
     draw.line([(x, 0), (x, top_end)], fill=color, width=line_width)
 
     # 下部 2/10：从底部向上画
     bottom_start = img.height - segment_height
     bottom_end = img.height
-    log_func(f"📏 下部竖线: 从 (x={x}, y={bottom_start}) 到 (x={x}, y={bottom_end})")
+    # log_func(f"📏 下部竖线: 从 (x={x}, y={bottom_start}) 到 (x={x}, y={bottom_end})")
     draw.line([(x, bottom_start), (x, bottom_end)], fill=color, width=line_width)
     
     return img
