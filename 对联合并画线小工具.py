@@ -256,7 +256,7 @@ def get_photoshop_app(log_func=print):
 class CoupletProcessorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("自动调图软件（图片合并 & CMYK模式转换）V26.01.18")
+        self.root.title("自动调图软件（图片合并 & CMYK模式转换）V26.01.19")
         self.root.geometry("1100x750")
 
         self.stop_flag = False
