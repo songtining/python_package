@@ -122,7 +122,7 @@ def draw_guides(img: Image.Image, top_cm=2.5, line_width=3,
 
     # 计算上下各二十分之一的高度
     segment_height = img.height * 1 // 25  # 从 // 10 改为 // 20
-    segment_height = max(200, segment_height)  # 确保至少为1像素
+    segment_height = max(1, segment_height)  # 确保至少为1像素
 
     # 上部 1/20：从顶部开始画
     top_end = segment_height
@@ -452,7 +452,7 @@ class CoupletProcessorApp:
                 offset_y = cm_to_px(top_cm, dpi)
                 merged.paste(img1, (0, offset_y))
                 merged.paste(img2, (img1.width, offset_y))
-                draw_guides(merged, top_cm=top_cm, line_width=line_w, color=(128, 128, 128), default_dpi=dpi, log_func=self.log)
+                draw_guides(merged, top_cm=top_cm, line_width=line_w, color=(128, 128, 128), default_dpi=dpi)
 
                 w_cm, h_cm = get_size_cm(merged, dpi, top_margin_cm=top_cm)
                 bucket_dir = ensure_folder(out_dir / f"{w_cm}x{h_cm}cm")
