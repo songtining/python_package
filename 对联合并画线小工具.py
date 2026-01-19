@@ -525,7 +525,7 @@ class CoupletProcessorApp:
                 canvas = Image.new("RGB", (merged_w, merged_h), (255, 255, 255))
                 offset_y = cm_to_px(top_cm, dpi)
                 canvas.paste(img, (0, offset_y))
-                draw_guides(canvas, top_cm=top_cm, line_width=line_w, color=(128, 128, 128), default_dpi=dpi, log_func=self.log)
+                draw_guides(canvas, top_cm=top_cm, line_width=line_w, color=(128, 128, 128), default_dpi=dpi)
 
                 w_cm, h_cm = get_size_cm(canvas, dpi, top_margin_cm=top_cm)
                 bucket_dir = ensure_folder(out_dir / f"{w_cm}x{h_cm}cm")
